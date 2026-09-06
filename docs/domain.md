@@ -1,7 +1,5 @@
 # Slow Burn Domain Model
 
-**Status:** Draft · 2026-09-04
-
 Slow Burn is a FIRE calculator that is free, private (nothing leaves the device), and
 fits your life. It models a household's income, taxes, savings, assets, liabilities,
 and expenses, then projects them forward to answer one question: **when can you stop
@@ -91,24 +89,24 @@ historical-sequence backtesting are deferred (§13.1).
 
 ```
 Household
-├── TaxUnit (1..n)                    - one tax return: filingStatus, state, locality,
-│   │                                   dependents, itemized total
-│   └── Person (1..n)                 - what caps, limits, and ages apply to
-│       ├── IncomeStream (0..n)
-│       ├── Account (0..n)            - balance + contribution
-│       ├── PayrollDeduction (0..n)   - pre-tax money that isn't saved (FSA etc.) (§3.4.5)
-│       └── SocialSecurityBenefit (0..1)
-├── Employer (0..n)                   - a potential source behind IncomeStreams and Accounts
-├── Asset (0..n)                      - non-account holdings (home, car)
-├── Liability (0..n)                  - debts, optionally secured by an Asset
-├── ExpenseCategory (0..n)
-│   └── ExpenseItem (0..n)
-├── OneTimeEvent (0..n)               - windfalls and lumpy costs
-└── Scenario (1..n)                   - a named set of Assumptions to project under
-    └── ProjectionSnapshot (0..n)     - frozen output history for that scenario (§3.13)
+├── TaxUnit (1..n)                       - one tax return: filingStatus, state, locality,
+│   │                                      dependents, itemized total (§3.2)
+│   └── Person (1..n)                    - what caps, limits, and ages apply to (§3.1)
+│       ├── IncomeStream (0..n)          - (§3.3)
+│       ├── Account (0..n)               - balance + contribution (§3.4)
+│       ├── PayrollDeduction (0..n)      - pre-tax money that isn't saved (FSA etc.) (§3.4.5)
+│       └── SocialSecurityBenefit (0..1) - (§3.11)
+├── Employer (0..n)                      - an optional source of IncomeStreams and Accounts (§3.3)
+├── Asset (0..n)                         - non-account holdings (home, car) (§3.5)
+├── Liability (0..n)                     - debts, optionally secured by an Asset (§3.6)
+├── ExpenseCategory (0..n)               - a group that houses types of ExpenseItems (§3.7)
+│   └── ExpenseItem (0..n)               - an recurring expense (§3.7)
+├── OneTimeEvent (0..n)                  - windfalls and lumpy costs (§3.8)
+└── Scenario (1..n)                      - a named set of Assumptions to project under (§3.10)
+    └── ProjectionSnapshot (0..n)        - frozen output history for that scenario (§3.13)
 
 AssetClass (return rates by class; ships with defaults the user edits, and exported, §3.9)
-TaxYear (reference data, versioned, bundled with the app, and never exported)
+TaxYear (reference data, versioned, bundled with the app, and never exported, (§3.12)
 ```
 
 ---
@@ -125,7 +123,8 @@ The unit that FICA caps, contribution limits, and age-gated account access apply
 | `displayName`                   | string                        |                                                                                                                                                                                                                                                                                                                                                                                          |
 | `birthDate`                     | date                          | **Required.** Drives 59½ access, catch-up eligibility, Medicare and IRMAA at 65, Social Security claiming and FRA, RMD age.                                                                                                                                                                                                                                                              |
 | `taxUnitId`                     | ID                            | Which filing entity this person belongs to.                                                                                                                                                                                                                                                                                                                                              |
-| `plannedRetirementAge`          | int?                          | Optional override; otherwise solved for.                                                                                                                                                                                                                                                                                                                                                 |
+| `plannedRetirementAge`          | int?                          | Optional. Fixes this person's retirement year rather than leaving §8.2 to solve for it. Set it for a hard target at any age, early or traditional (§9.4), and `spendingHeadroom` (§5) then says whether that target works. Null is the common case and the one the engine is built around. |
+| `retirementYear`                | int \| `notReachable`         | **Derived**, and what the rest of the model keys off: `plannedRetirementAge` applied to `birthDate` where set, otherwise the household's solved year (§8.2). See below. |
 | `hsaCoverage`                   | {fromYear: int, tier: enum}[] | Ordered timeline of `none` \| `self` \| `family`, each entry effective from `fromYear` until the next. One entry is the common case; a second expresses `family` → `self` when a child ages off the plan. Selects which HSA contribution limit applies, and whether one applies at all (§3.4.2).                                                                                         |
 | `employerHealthCoverageEndYear` | int?                          | Last year this person is covered by an employer plan. **Defaults to the year before their `retirementYear`.** While covered they contribute no ACA benchmark premium and generate no premium tax credit (§4.3.5), and their premium is a `PayrollDeduction` (§3.4.5). Extend it for employer retiree coverage, or past the horizon for a Barista FIRE job that carries insurance (§9.2). |
 | `socialSecurity`                | SocialSecurityBenefit?        | See §3.11.                                                                                                                                                                                                                                                                                                                                                                               |
@@ -211,14 +210,43 @@ UI can offer a list rather than a text box.
 | `employerId`                 | ID?    | Which `Employer` pays it, matched against `Account.employerId` so the match and §415(c) can see this stream's pay (§3.4). Null where no plan is tied to it.                                                                                                                                                                                                          |
 | `label`                      | string |                                                                                                                                                                                                                                                                                                                                                                      |
 | `kind`                       | enum   | `w2Wages`, `selfEmployment`, `bonus`, `rsuVesting`, `rentalNet`, `pension`, `other`                                                                                                                                                                                                                                                                                  |
-| `grossAnnualAmount`          | Money  |                                                                                                                                                                                                                                                                                                                                                                      |
+| `grossAnnualAmount`          | Money  | The **full-year** rate. What a partial year actually pays is `resolvedAmount` below, and every §4 sum means that. |
 | `realGrowthRate`             | Rate   | **Per stream**, so "my salary grows 1% real, my spouse's is flat" is expressible without one household-wide raise rate.                                                                                                                                                                                                                                              |
 | `startYear`                  | int?   | First year the stream is active, and the year `realGrowthRate` compounds from. Null means it is already running, the common case; set it for a job beginning mid-projection or a spouse returning to work.                                                                                                                                                           |
 | `endYear`                    | int?   | Last year it is active. **Defaults to the year before the owning Person's `retirementYear`** for the earned kinds (`w2Wages`, `bonus`, `rsuVesting`, `selfEmployment`) and to null, meaning indefinitely, for `rentalNet`, `pension`, and `other`. Set it explicitly for a contract ending, a career change, or a Barista FIRE job that runs past retirement (§9.2). |
+| `startMonth`                 | int?   | 1–12, null meaning January. The month the stream begins, which prorates its **first** year only. |
+| `endMonth`                   | int?   | 1–12, null meaning December. The month it ends, which prorates its **last** year only. Set both across a job change so the transition year carries the pay actually received rather than two full salaries. |
 | `isFicaSubject`              | bool   | Derived from `kind`, overridable.                                                                                                                                                                                                                                                                                                                                    |
 | `isQualifiedBusinessIncome`  | bool   | Whether this stream feeds the §199A deduction (§4.3.2). Defaults **true** for `selfEmployment` and `rentalNet`, false otherwise.                                                                                                                                                                                                                                     |
 | `isSpecifiedServiceBusiness` | bool   | Whether this is an SSTB (consulting, law, medicine, financial services). Default false. Recorded so the deferred above-threshold limits (§13.2) have somewhere to land, and so `qbiLimitNotModeled` can say *why* it matters.                                                                                                                                        |
 | `variability`                | enum   | `guaranteed` \| `variable`. **Display only**, read by no engine calculation. Bonuses and RSUs are flagged as not-guaranteed so a plan resting on them is visibly doing so.                                                                                                                                                                                           |
+
+**A span is prorated in its own first and last year, and only there.** Every entity carrying
+`startYear`/`endYear` carries `startMonth`/`endMonth` alongside them, null meaning the whole
+year:
+
+```
+activeFraction(year) = 1 − (startMonth − 1) / 12   if year = startYear
+                         − (12 − endMonth)  / 12   if year = endYear
+
+resolvedAmount(IncomeStream, year) = grossAnnualAmount, grown to that year by
+                                       realGrowthRate, × activeFraction(year)
+```
+
+`grossAnnualAmount` stays the full-year rate, so growth compounds on the rate and the
+proration lands after it. Every §4 sum over `IncomeStream`s means `resolvedAmount`.
+
+The same fraction scales a `PayrollDeduction`'s `annualAmount` (§3.4.5), an `ExpenseItem`'s
+inflated amount (§3.7), and a `fixedAmount` `Contribution` (§3.4.1). A `percentOfGross`
+`Contribution` takes no scaling of its own, its base already being the streams' resolved
+amounts.
+
+This does not contradict §6.4's rule that the pipeline runs on full-year inputs. `frac`
+prorates a projection year that is itself partial, and prorating a salary before the
+brackets see it would understate the household's effective rate. These months do the
+opposite: they produce the income the household genuinely received across the whole year,
+which then meets the brackets once. A person leaving one job in July and starting another
+in August is carrying one salary, and without them the engine reads two.
 
 **Earned income stops at retirement; unearned income does not.** `endYear` bounds the
 span over which `realGrowthRate` compounds, and it stops a salary when its owner
@@ -283,13 +311,15 @@ and anything left over is forfeited, so it has no persistent balance to compound
 | `reducesFicaWages`            | bool           |                                                                                                                                                                                                                                                                                                                                                       |
 | `startYear`                   | int?           | First year the contribution runs. Null means it is already running, the common case; set it for a job beginning mid-projection or a spouse returning to work.                                                                                                                                                                                         |
 | `endYear`                     | int?           | Last year it runs. **Defaults to the year before the owner's `retirementYear`**, matching `IncomeStream.endYear` (§3.3), since a payroll deferral has no pay to come out of once earned income stops and an IRA contribution needs compensation. Set it earlier for Coast FIRE (§9.3), or later for a Barista FIRE job that keeps a plan open (§9.2). |
+| `startMonth`                  | int?           | 1–12, null meaning January. Prorates the first year, per §3.3. |
+| `endMonth`                    | int?           | 1–12, null meaning December. Prorates the last year, per §3.3. |
 
 **Every formula in §4 that sums `Contribution`s means the resolved dollar amount for the
 year.** The raw stored `value` is `resolvedAmount`:
 
 ```
-base           = Σ grossAnnualAmount over IncomeStreams in contributionBaseStreamIds
-uncapped       = value                    if mode = fixedAmount
+base           = Σ resolvedAmount over IncomeStreams in contributionBaseStreamIds  // §3.3
+uncapped       = value × activeFraction(year)     if mode = fixedAmount   // §3.3
                = value × base             if mode = percentOfGross
 
 catchUp        = the amount of the TaxYear.contributionLimits[limitFamily].catchUpTiers
@@ -297,7 +327,7 @@ catchUp        = the amount of the TaxYear.contributionLimits[limitFamily].catch
 familyCap      = the limit for this account's limitFamily + catchUp        // table below
 capped         = min(uncapped, familyCap)
 
-employerComp   = min(Σ grossAnnualAmount over this person's IncomeStreams carrying
+employerComp   = min(Σ resolvedAmount over this person's IncomeStreams carrying
                        this account's employerId,
                      TaxYear.contributionLimits.compensationLimit401a17)
                = 0  where employerId is null
@@ -353,8 +383,10 @@ them,
 and someone holding both a `traditionalIra` and a `rothIra` gets one IRA limit between those.
 
 Where the uncapped total across accounts sharing a limit exceeds it, each is reduced pro
-rata by its share, matching §4.4.4's rule for splitting a partially funded waterfall step.
-This is where §12's invariant 20 is enforced.
+rata by its share, matching the rule for splitting a partially funded step of the
+**contribution waterfall**, the ordered list of destinations each year's surplus is poured
+through (§4.4.4). Later sections call it the waterfall. This is where §12's invariant 20 is
+enforced.
 
 **HSA contributions stop at 65**, since Medicare enrollment ends HSA eligibility and the
 engine already assumes Medicare at 65 (§8.4.3). `resolvedAmount` is zero for any `hsa`
@@ -432,13 +464,15 @@ place in §4.1 and §4.3, with no balance and no growth.
 | `personId`                    | ID     | Owner. Payroll deductions are per employee, and FICA is assessed per person.                                                                                                                                                                                                                                                                                                                      |
 | `label`                       | string |                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `kind`                        | enum   | `healthPremium`, `dentalVisionPremium`, `healthFsa`, `dependentCareFsa`, `commuterBenefit`, `other`                                                                                                                                                                                                                                                                                               |
-| `annualAmount`                | Money  | Normalized to annual, like `ExpenseItem.frequency`.                                                                                                                                                                                                                                                                                                                                               |
+| `annualAmount`                | Money  | Normalized to annual, like `ExpenseItem.frequency`, and scaled by `activeFraction(year)` in the deduction's first and last year (§3.3), so an FSA election on a job that ends in July deducts seven months.                                                                                                                                                                                                                                                                                                                                               |
 | `reducesFederalTaxableIncome` | bool   | Derived from `kind`, overridable: true for the pre-tax kinds. A premium can be post-tax, domestic-partner coverage being the common case.                                                                                                                                                                                                                                                         |
 | `reducesStateTaxableIncome`   | bool   | Derived from `kind`, overridable, with the same state divergence as `Contribution` (§3.4.3). All three override independently, a premium being pre-tax federally and post-tax in some states.                                                                                                                                                                                                     |
 | `reducesFicaWages`            | bool   | Derived from `kind`, overridable, over the same pre-tax set. **This is the only way to express it**, since an `ExpenseItem` cannot reduce FICA wages.                                                                                                                                                                                                                                             |
 | `expenseCategoryId`           | ID?    | Which `ExpenseCategory` this spending would otherwise have appeared under, for reporting only.                                                                                                                                                                                                                                                                                                    |
 | `startYear`                   | int?   | First year the deduction runs. Null means it is already running.                                                                                                                                                                                                                                                                                                                                  |
 | `endYear`                     | int?   | Last year it runs. Defaults to that person's `employerHealthCoverageEndYear` (§3.1) for the coverage-related kinds, so a premium and the coverage it buys end together, and to the year before their `retirementYear` for the rest, a deduction needing a paycheck to come out of. An employer retiree premium runs past retirement and simply reduces no wages, there being none left to reduce. |
+| `startMonth`                  | int?   | 1–12, null meaning January. Prorates the first year, per §3.3. |
+| `endMonth`                    | int?   | 1–12, null meaning December. Prorates the last year, per §3.3. |
 
 **This is where pre-tax payroll money lives.**
 
@@ -458,7 +492,7 @@ covers everything else the household owns.
 | `personId`                 | ID?    | Which person owns this, and so whose `TaxUnit` its sale gain is taxed on (§4.3.1). Null means jointly held, which resolves to the household's only `TaxUnit` and must therefore be set once there are two (invariant 25).                                                            |
 | `label`                    | string |                                                                                                                                                                                                                                                                                      |
 | `category`                 | enum   | `primaryResidence`, `investmentProperty`, `vehicle`, `collectible`, `businessEquity`, `other`                                                                                                                                                                                        |
-| `currentValue`             | Money  |                                                                                                                                                                                                                                                                                      |
+| `currentValue`             | Money  | Today's estimate, and an ordinary input. Re-enter it after an appraisal: every run projects forward from `asOfDate`, so a revised figure takes effect at once and `costBasis` is unaffected.                                                                                         |
 | `costBasis`                | Money  | Basis for gain on sale, entered as purchase price plus improvements to date. Static across the projection, unlike `Account.costBasis` (§6.3): later improvements are not modeled (§13.1).                                                                                            |
 | `realAppreciationRate`     | Rate   | Per asset, defaulted from category, user-overridable. Vehicles default negative. One rate across all three bands, since a home is not where the plan's risk sits.                                                                                                                    |
 | `accumulatedDepreciation`  | Money  | `investmentProperty` only. Straight-line depreciation claimed to date; entered as an opening figure and **accrued by the engine each year the property is held** (below). Reduces basis, so it raises the gain on sale, and is taxed at its own rate. Zero for every other category. |
@@ -486,7 +520,7 @@ the Asset enters every net-worth measure at costBasis and appreciates from this 
 the securing Liability begins amortizing at its originationDate (§3.6)
 ```
 
-`currentValue` is read only for an `Asset` already held; one acquired later enters at what
+`currentValue` applies only to an `Asset` already held; one acquired later enters at what
 it cost. A null `purchaseFundingAccountId` means no money changed hands, which is how an
 inheritance is expressed: `costBasis` is that year's fair market value, the stepped-up basis
 statute gives it, and no draw occurs.
@@ -562,11 +596,13 @@ Debts, tracked as first-class entities rather than folded into net worth or expe
 | `currentBalance`                 | Money      |                                                                                                                                                                                                                                                                                               |
 | `interestRate`                   | Rate       | **Nominal, and used nominally**: the amortization schedule runs on the contract's own terms. Converted to real only for comparison (§4.4's `highInterestDebt` step) and when the resulting payment enters the real-dollar pipeline. See below.                                                |
 | `monthlyPayment`                 | Money      | **Authoritative for cash flow**: what actually leaves the account each month, and what §4.4's `debtService` term sums.                                                                                                                                                                        |
-| `monthlyEscrowAmount`            | Money?     | The non-amortizing portion of `monthlyPayment` collected by the servicer. **Optional, inferred when null** (see below). `principalAndInterest = monthlyPayment − monthlyEscrow` actually amortizes the loan.                                                                                  |
+| `monthlyEscrowAmount`            | Money?     | The non-amortizing portion of `monthlyPayment` collected by the servicer. **Optional, inferred when null** (see below).                                                                                  |
 | `monthlyPmiAmount`               | Money?     | PMI, if the payment includes it. **A component of the escrow total**, broken out separately because it ends on its own schedule, usually years before payoff. Dropping it reduces both `monthlyPayment` and the escrow inside it.                                                             |
+| `principalAndInterest`           | Money      | **Derived**: `monthlyPayment − monthlyEscrow` (below). What actually amortizes the loan, and what the payoff derivation runs on. |
 | `escrowContinuesAfterPayoff`     | Rate       | What fraction of the escrow the household keeps paying once the loan is gone. **Default 1.0.**                                                                                                                                                                                                |
 | `extraPrincipalPayment`          | Money      | Additional monthly principal the household pays voluntarily. Default 0. Amortizes the loan faster and reaches cash flow through §4.4's `debtService` term. This is a standing choice the user has already made, distinct from the engine-directed `highInterestDebt` waterfall step (§4.4.4). |
-| `originationDate` / `termMonths` | date / int | Together yield the payoff year. A future `originationDate` is the financing half of an `Asset` acquisition (§3.5), where the purchase rule nets the borrowed principal against the price; borrowing that funds no acquisition is deferred (§13.1).                                            |
+| `originationDate`                | date       | First payment date. A future one is the financing half of an `Asset` acquisition (§3.5), where the purchase rule nets the borrowed principal against the price; borrowing that funds no acquisition is deferred (§13.1). |
+| `termMonths`                     | int        | Length of the loan. With `originationDate` it yields a contractual payoff year, which the derived one below may disagree with. |
 | `securedAssetId`                 | ID?        | The `Asset` this debt is secured by, and the mirror of `Asset.securedByLiabilityId` (invariant 5). Null for unsecured debt.                                                                                                                                                                   |
 | `isTaxDeductibleInterest`        | bool       | Mortgage interest and student loan interest, subject to limits. Student loan interest feeds `deductibleStudentLoanInterest` (§4.3.1); mortgage interest feeds itemized deductions, whose derivation is deferred (§13.2).                                                                      |
 
@@ -659,6 +695,8 @@ anywhere else leaves the college account untouched.
 | `frequency`             | enum   | `monthly`, `quarterly`, `annual`: normalized to annual on save. A one-off amount is a `OneTimeEvent` (§3.8), so there is no `oneTime` frequency here.                                                                                                               |
 | `startYear`             | int?   | First year the item is spent. Null means it is already running.                                                                                                                                                                                                     |
 | `endYear`               | int?   | Last year it is spent. Daycare for six years, college for four.                                                                                                                                                                                                     |
+| `startMonth`            | int?   | 1–12, null meaning January. Prorates the first year, per §3.3. |
+| `endMonth`              | int?   | 1–12, null meaning December. Prorates the last year, per §3.3. |
 | `relativeInflationRate` | Rate?  | **Real, relative to general inflation.** Healthcare ≈ +2.5%; groceries ≈ 0%; consumer electronics negative. Null inherits the category's `defaultRelativeInflation`, which is the whole point of that field; a stored 0 is a deliberate flat rate and overrides it. |
 | `phase`                 | enum   | `preRetirementOnly` \| `postRetirementOnly` \| `both`. The boundary is the household's `retirementYear`, its first retired year (§3.1), so a `preRetirementOnly` item runs through the year before it and a `postRetirementOnly` item from it.                      |
 | `postRetirementAmount`  | Money? | For `both` items whose amount changes at retirement.                                                                                                                                                                                                                |
@@ -668,7 +706,7 @@ amount for a projected year is
 
 ```
 rate           = relativeInflationRate ?? its category's defaultRelativeInflation
-amount(year)   = amount × (1 + rate)^(year − currentYear)
+amount(year)   = amount × (1 + rate)^(year − currentYear) × activeFraction(year)   // §3.3
 ```
 
 and `postRetirementAmount` inflates from the same base year on the same rate. A zero rate,
@@ -709,12 +747,20 @@ bought.
 
 ### 3.9 AssetClass and Assumptions
 
-**AssetClass:** `id`, `label` (`usStocks`, `intlStocks`, `bonds`, `reit`, `cash`,
-`crypto`), `expectedRealReturn`, `pessimisticRealReturn`, `optimisticRealReturn`,
-`incomeYield`, `qualifiedIncomeFraction`. Every field on an entity declared in prose like
-this one is required unless its own note says otherwise.
+**AssetClass:**
 
-**`incomeYield` decomposes the return; it does not add to it.** Total return arrives in
+| Field                     | Type | Notes                                                                 |
+|---------------------------|------|-----------------------------------------------------------------------|
+| `id`                      | ID   |                                                                       |
+| `label`                   | enum | `usStocks`, `intlStocks`, `bonds`, `reit`, `cash`, `crypto`           |
+| `expectedRealReturn`      | Rate | The middle band.                                                      |
+| `pessimisticRealReturn`   | Rate | The low band.                                                         |
+| `optimisticRealReturn`    | Rate | The high band.                                                        |
+| `incomeYield`             | Rate | Dividends and interest paid out, as a fraction of balance. See below. |
+| `qualifiedIncomeFraction` | Rate | The portion of `incomeYield` taxed at preferential rates (§4.3.3).    |
+
+**`incomeYield` is the cash the holding pays out, dividends and interest, as a fraction of
+balance, and it decomposes the return without adding to it.** Total return arrives in
 two forms with different tax treatment: distributions taxed in the year received even when
 reinvested, and appreciation taxed only when realized. For each band:
 
@@ -747,7 +793,7 @@ materially higher tax drag than its headline yield suggests.
 |---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `generalInflationRate`          | Display and input conversion only (§1.1), and the rate §7.4 deflates non-indexed thresholds by, which makes it load-bearing.                       Default 0.025.                                                                                                                                                                                                                                                                                                                                                      |
 | `safeWithdrawalRate`            | Real. Default 0.04.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `contributionWaterfall`         | `WaterfallStep[]` (§4.4.4): an ordered permutation of the fixed step-kind vocabulary. **Not account IDs**: each step sweeps every eligible account of that kind across the household.                                                                                                                                                                                                                                                                                                                                  |
+| `contributionWaterfall`         | `WaterfallStep[]` (§4.4.4): an ordered subset of the fixed step-kind vocabulary, since a scenario may omit steps as Coast FIRE does (§9.3). **Not account IDs**: each step sweeps every eligible account of that kind across the household.                                                                                                                                                                                                                                                                                                                                  |
 | `withdrawalOrder`               | `WithdrawalSource[]` (§8.4.1): an ordered list of tax-character source kinds. **Not account IDs**, for the same reason as `contributionWaterfall`.                                                                                                                                                                                                                                                                                                                                                                     |
 | `highInterestDebtThresholdRate` | **Real** rate, default 0.06. A `Liability` whose real rate (§3.6) exceeds this is paid down by the `highInterestDebt` waterfall step (§4.4.4) ahead of Roth/401(k)/brokerage funding. Real so it compares like-for-like against `AssetClass` real returns, since paying down debt is an investment decision and both sides need the same units (§1.1). Fixed rather than derived from the active band's return, so a plan's debt strategy does not silently differ between its pessimistic and optimistic projections. |
 | `includeSocialSecurity`         | bool, default true. Scenario-level master switch: when false, no person's benefit is counted anywhere (§4.3.1, §8.4) regardless of their own `includeInProjection` (§3.11). Both must be true for a benefit to appear, so the scenario flag answers "what if Social Security isn't there at all" and the per-person flag answers "I count on mine but not my spouse's."                                                                                                                                                |
@@ -761,13 +807,19 @@ materially higher tax drag than its headline yield suggests.
 ### 3.10 Scenario
 
 A **named, saved set of `Assumptions`** applied to a household, comparable side by side
-against other scenarios. "Retire in Colorado at 55", "coast from 45", and "one income for
-three years" are scenarios.
+against other scenarios.
 
-`id`, `householdId`, `label`, `assumptions`, `createdAt`.
+| Field         | Type        | Notes                                                                                                    |
+|---------------|-------------|------------------------------------------------------------------------------------------------------------|
+| `id`          | ID          |                                                                                                          |
+| `householdId` | ID          | Owner.                                                                                                   |
+| `label`       | string      | "Retire in Colorado at 55", "coast from 45", "one income for three years".                               |
+| `assumptions` | Assumptions | The whole set (§3.9), carried rather than referenced, so a scenario keeps the numbers it was saved with. |
 
 **A `Scenario` varies `Assumptions` only; differing household *data* means a cloned
-`Household`.** Band return rates are a third case neither route
+`Household`.** So "what if markets return 4%" is a scenario, and "what if I take the other job" is a clone: change that household's `IncomeStream`s and compare the two side by side
+through §10.2, which compares any two snapshots and names what differs. Band return rates
+are a third case neither route
 reaches: they sit on `AssetClass` (§3.9), which no `Household` owns, so "the same plan at 4%
 instead of 5%" cannot be saved and compared. Per-scenario rates are deferred (§13.1). The
 alternative,
@@ -878,7 +930,8 @@ a floor instead (§3.11). Composed of:
   apart (§4.2)
 - `additionalMedicareRate` (0.009) and `additionalMedicareThreshold[filingStatus]` **(fixed)**:
   **(fixed)**
-- `niitThreshold[filingStatus]` **(fixed)**, `niitRate` (0.038):
+- `niitThreshold[filingStatus]` **(fixed)**, `niitRate` (0.038), the net investment income
+  tax (NIIT), a surtax on investment income above the threshold:
 
 *Social Security*
 
@@ -982,6 +1035,7 @@ can be compared against it. See §10 for why this exists and how it is triggered
 | `retirementYear`                                                                | {pessimistic, expected, optimistic: int \| `notReachable`}   | Frozen per-band result.                                                                                                                                                                                                                                                             |
 | `fireNumber`                                                                    | {pessimistic, expected, optimistic: Money \| `notReachable`} | Per band, like `retirementYear` and for the same reason: §8.1 sizes it over `retirementDurationYears`, which each band's own solved retirement year fixes. A band with no qualifying year has no duration and so no target, and reports `notReachable` beside its `retirementYear`. |
 | `netWorth` / `liquidNetWorth` / `investableNetWorth` / `afterTaxLiquidNetWorth` | Money                                                        | All four measures from §5, taken at `asOfDate` rather than projected, so they read the same in every band and §10.2 can report a delta on each.                                                                                                                                     |
+| `sustainableLevelSpending`                                                      | {pessimistic, expected, optimistic: Money} | §5, read at the retirement year. The headline a household with a fixed retirement date tracks, where one solving for a date tracks `retirementYear` (§9.4). |
 | `savingsRate`                                                                   | Rate                                                         | Taken at `asOfDate` like the net-worth measures, so it too reads the same in every band.                                                                                                                                                                                            |
 
 A snapshot stores **outputs only**, which keeps it to a handful of scalars, so a daily
@@ -1001,12 +1055,12 @@ base.
 Per **Person**:
 
 ```
-wageIncome      = Σ IncomeStream.grossAnnualAmount  where kind in (w2Wages, bonus,
-                                                                    rsuVesting)
-seEarnings      = Σ IncomeStream.grossAnnualAmount  where kind = selfEmployment
+wageIncome      = Σ resolvedAmount(IncomeStream)   where kind in (w2Wages, bonus,
+                                                                    rsuVesting)   // §3.3
+seEarnings      = Σ resolvedAmount(IncomeStream)   where kind = selfEmployment
 ficaExempt      = Σ resolvedAmount(Contribution)   where reducesFicaWages = true
                 + Σ annualAmount(PayrollDeduction) where reducesFicaWages = true
-ficaWages       = max(0, Σ IncomeStream.grossAnnualAmount where isFicaSubject
+ficaWages       = max(0, Σ resolvedAmount(IncomeStream) where isFicaSubject
                          − ficaExempt)
 ```
 
@@ -1067,6 +1121,15 @@ because it is assessed per TaxUnit rather than per person.
 ### 4.3 Income taxes (per TaxUnit)
 
 #### 4.3.1 Income and above-the-line deductions
+
+Everything the tax unit received this year, less the deductions statute allows before AGI.
+Every household reaches this part.
+
+**Adjusted gross income (AGI)** is that figure, and the rate schedule and most phase-outs
+are measured against it. A **modified AGI (MAGI)** is AGI with particular items added back,
+and statute writes a different one for each rule that uses it, so no single MAGI exists here:
+`preDeductionMagi` gates the two deductions below, `acaMagi` sizes the premium tax credit
+(§4.3.5), and IRMAA reads a plain `federalAgi` from two years earlier (§8.4.3).
 
 **Social Security taxability** (relevant once a person in the `TaxUnit` has reached
 `claimingAge`, §3.11 and §8.4):
@@ -1192,6 +1255,9 @@ participates in would be excluded, and that distinction is not modeled.
 
 #### 4.3.2 Taxable income and the §199A deduction
 
+AGI less the standard or itemized deduction, then less the pass-through business deduction.
+The §199A half applies only where someone has self-employment or rental income.
+
 ```
 federalAgi      = nonSSIncome + taxableSS
 
@@ -1235,6 +1301,9 @@ professional the limits target.
 
 #### 4.3.3 Brackets, capital gains, and NIIT
 
+The rate schedule itself. Ordinary income and long-term gains are taxed on separate
+schedules, and a surtax reaches investment income above a fixed threshold.
+
 ```
 ordinaryPortion     = max(0, fedTaxable − realizedLongTermGains − qualifiedDividends)
 preferentialPortion = fedTaxable − ordinaryPortion   // ≡ min(realizedLongTermGains +
@@ -1264,6 +1333,9 @@ taxBeforeCredits   = ordinaryTax + ltcgTax + recaptureTax + niit
 
 #### 4.3.4 The Child Tax Credit
 
+Applies while a dependent is under `childTaxCreditQualifyingAge`. It is the one credit
+modeled, and the only thing here that can make federal tax negative.
+
 ```
 qualifyingChildren = count of dependents under TaxYear.childTaxCreditQualifyingAge
                        at the end of the tax year
@@ -1292,6 +1364,13 @@ the benefit in exactly the low-income years Coast and Barista FIRE scenarios (§
 are built around.
 
 #### 4.3.5 The ACA premium tax credit
+
+A household that retires before 65 buys its own health insurance, and the federal government
+pays part of the premium on a sliding scale set by income against the federal poverty line.
+An early retiree largely chooses their own income by choosing which accounts to draw from
+(§8.4.4), so they largely choose the size of this subsidy. That is why it earns this much of
+the section: it is the largest expense lever the plan has, and it turns on MAGI rather than
+on the tax the rest of §4.3 computes.
 
 **ACA premium tax credit** (per TaxUnit, only while a covered person is under 65):
 
@@ -1360,6 +1439,9 @@ offset. That is how households experience it, through advance payments to the in
 it keeps `federalTax` comparable to a real return.
 
 #### 4.3.6 State, local, and the total owed
+
+The state and locality layers, then everything above summed into one figure the pipeline
+spends.
 
 ```
 stateTax        = brackets or flat rate from TaxYear.stateRules[stateCode], applied to
@@ -1451,11 +1533,14 @@ netSurplus      = grossIncome
 **`annualExpenses` is the household's whole cost of living.** The `ExpenseItem` subtotal carries its
 own name, `expenseItemTotal`.
 
-**Health insurance is an engine term the user doesn't maintain.** §4.3.5 computes the
-benchmark premium and the credit against it, so a user-entered premium would be priced
-against a subsidy that has nothing to do with it, and a credit reaching `netSurplus`
-without its premium is a subsidy with no cost attached. The net figure enters here and is
-booked to the `health` meta-category so §8.4.1's `hsaQualifiedMedical` cap can see it.
+**`healthInsurance` covers only the years the household buys its own coverage.** While a
+person is on an employer plan, their premium is whatever the employer charges them and they
+enter it as a `healthPremium` `PayrollDeduction` (§3.4.5); the engine adds nothing. Once
+that coverage ends, §4.3.5 computes the benchmark premium and the credit against it, so a
+user-entered premium would be priced against a subsidy that has nothing to do with it, and a
+credit reaching `netSurplus` without its premium is a subsidy with no cost attached. The
+net figure enters here and is booked to the `health` meta-category so §8.4.1's `hsaQualifiedMedical`
+cap can see it.
 Invariant 15 stops an `ExpenseItem` from restating it.
 
 **Restricted education money is spent on what restricts it.** A `529` balance sits outside
@@ -1522,18 +1607,17 @@ where the surplus would otherwise be routed into an IRA the household cannot leg
 #### 4.4.2 Funding windows
 
 **Not every destination can accept money at the same time of year.** A 401(k) elective
-deferral is elected in open enrollment and withheld from paychecks, with no mechanism to
-sweep December's leftover cash into it. An IRA or a direct HSA contribution genuinely can
-be funded after year end, up to the filing deadline. A brokerage deposit or a debt payment
-can happen any time.
+deferral comes out of a paycheck, so once the year's paychecks are spent there is no way to
+sweep December's leftover cash into it. An IRA or a direct HSA contribution can be funded after 
+year's end, up to the filing deadline. A brokerage deposit or a debt payment can happen any time.
 
 Each `WaterfallStep` therefore carries a `fundingWindow`:
 
-| `fundingWindow`   | Steps                                                          | When it is resolved                       |
-|-------------------|----------------------------------------------------------------|-------------------------------------------|
-| `payrollElection` | `matchCapture`, `hsaPayrollToLimit`, `electiveDeferralToLimit` | **Before §4.1**, from *projected* surplus |
-| `filingDeadline`  | `iraToLimit`, `hsaDirectToLimit`                               | After §4.3, from *realized* surplus       |
-| `anytime`         | `highInterestDebt`, `cashBufferToTarget`, `taxableBrokerage`   | After §4.3, from *realized* surplus       |
+| `fundingWindow`   | Steps                                                          | When it is resolved                   |
+|-------------------|----------------------------------------------------------------|---------------------------------------|
+| `payrollElection` | `matchCapture`, `hsaPayrollToLimit`, `electiveDeferralToLimit` | Before §4.1, from *projected* surplus |
+| `filingDeadline`  | `iraToLimit`, `hsaDirectToLimit`                               | After §4.3, from *realized* surplus   |
+| `anytime`         | `highInterestDebt`, `cashBufferToTarget`, `taxableBrokerage`   | After §4.3, from *realized* surplus   |
 
 The user still configures **one ordered list**. The engine resolves it in two sweeps:
 
@@ -1556,8 +1640,8 @@ misses `ficaExempt` and overstates payroll tax for the whole accumulation phase.
 
 The two sweeps buy three things:
 
-- **Deferrals behave like deferrals.** One is set in advance from an income estimate, as
-  a person does at open enrollment, and it is capped by what that estimate supports.
+- **Deferrals behave like deferrals.** One is set in advance from an income estimate, the
+  way a person sets a deferral rate, and it is capped by what that estimate supports.
 - **The tax computation gets more accurate, and cheaper.** The largest pre-tax levers, the
   elective deferral and payroll HSA, are known *before* §4.3, so they reduce that year's
   taxable income in a single pass without iteration.
@@ -1629,7 +1713,9 @@ another's.
 8. `taxableBrokerage` *(anytime)*: the remainder
 
 A scenario's `contributionWaterfall` reorders or omits these steps. It cannot invent new
-ones, and it cannot change a step's `fundingWindow`.
+ones, and it cannot change a step's `fundingWindow`. **`taxableBrokerage` is the one step it
+may not drop** (invariant 30), being what catches whatever the others leave; without it a
+year's surplus would have nowhere to land.
 
 **`sep` and `education` have no step, so surplus never reaches them.** For a `529` that is
 right, sweeping into a restricted account lowering `liquidNetWorth`. For a SEP it is a real
@@ -1679,7 +1765,9 @@ the balance down to it, and below it only when every other source is exhausted.
 | `savingsRate`                       | (committedContribs + Σ 12 × extraPrincipalPayment over active Liabilities + netSurplus) / grossIncome                                                                                                                                                            |
 | `retirementYear`                    | Per `Person`, §3.1: their `plannedRetirementAge` applied to `birthDate`, else the household's. For the household, the year §8.2 solves for.                                                                                                                      |
 | `retirementDurationYears`           | `projectionHorizonAge` − the youngest person's age at the retirement year. During §8.2's search that is the **candidate** year under test, since it feeds both the FIRE number that year is tested against (§8.1) and the `swrHorizonMismatch` check.            |
-| `fireNumber`                        | §8.1                                                                                                                                                                                                                                                             |
+| `fireNumber`                        | §8.1                                                                                                                                                                                                                             |
+| `sustainableLevelSpending`          | `afterTaxLiquidNetWorth` projected to the first year of retirement × `safeWithdrawalRate`. The inverse of `fireNumber`: what the plan as entered will support, rather than what a chosen standard of living demands (§9.4). `notReachable` where `retirementYear` is. |
+| `spendingHeadroom`                  | `sustainableLevelSpending` − `levelEquivalentRetirementExpenses`. Positive is room to spend more, negative is the annual gap (§9.4). `notReachable` where either side is.                                                                                                                                                                                                                                                             |
 
 **`savingsRate` measures employee contributions only**, excluding employer match (§4.4.1),
 which is deliberate and conservative. Principal paydown counts as saving whichever route it
@@ -1713,7 +1801,7 @@ for year in currentYear .. horizon:
       §4.3 ⇄ §4.4.3 fixed point on FULL-YEAR figures
         → taxes, committed contributions, surplus
     scale that year's recurring cash flows and the tax on them × frac  // 1.0 after year 0;
-      oneTimeNet and the tax on it are not scaled, being point events (below)
+      oneTimeNet and the tax on it are not scaled, being dated to the year (below)
     apply committed contributions and their employer match to balances
 
     if netSurplus ≥ 0:
@@ -1858,28 +1946,28 @@ withdrawal treatment.
 
 ### 6.4 Why the pipeline runs on full-year figures
 
-**Proration applies to the pipeline's results, never to its inputs.** The §4 pipeline always
-runs on full annual figures, and `frac` scales what comes out. Running it on prorated inputs
-would tax a partial year as though it were a whole one: five months of a $200,000 salary is
-$83,000, and $83,000 through progressive brackets yields a far lower effective rate than the
-household actually pays. The Social Security wage base breaks the same way, since a
-projection run in August must not hand a high earner a fresh, unconsumed wage base for the
-remaining months.
+**Proration applies to the annual cash-flow pipeline's results (§4), never to its inputs.** The
+pipeline always runs on full annual figures, and `frac` scales what comes out. Running it on
+prorated inputs would tax a partial year as though it were a whole one: five months of
+a $200,000 salary is$83,000, and $83,000 through progressive brackets yields a far lower effective
+rate than the household actually pays. The Social Security wage base breaks the same way, since a
+projection run in August must not hand a high earner a fresh, unconsumed wage base for the remaining
+months.
 
 Computing the full year and then taking `frac` of the result gives the household's true
 effective rate applied to the part of the year that has not happened yet. The earlier months
 are excluded rather than recomputed, since the balances the user entered already
 reflect them.
 
-An `ExpenseItem`, `IncomeStream`, or `PayrollDeduction` whose own `startYear`/`endYear` only
-partially overlaps year 0 is prorated against its own overlap with the remaining year rather
-than against `yearFraction(0)`. A stream starting in October of year 0 counts for its 3
-months, not `frac`'s share of 12.
+An `ExpenseItem`, `IncomeStream`, `Contribution`, or `PayrollDeduction` whose own span only
+partially overlaps year 0 is prorated against that overlap rather than against
+`yearFraction(0)`. All four carry `startMonth`/`endMonth` (§3.3), so a stream starting in
+October of year 0 counts for its 3 months and not `frac`'s share of 12.
 
-**A point event in year 0 is taken as still ahead, and `frac` does not scale it.** An
-`OneTimeEvent`, an `acquisitionYear`, or a `plannedSaleYear` in `currentYear` carries no
-month, so it fires regardless; anything already past is by then inside the entered balances
-and would be counted twice. The UI should say so wherever an event is dated this year.
+**An `OneTimeEvent`, an `acquisitionYear`, or a `plannedSaleYear` in `currentYear` fires in
+full, and `frac` does not scale it.** None carries a month, so the engine cannot tell whether
+it has happened yet and treats it as still ahead. One that has already happened is by then inside the entered balances and would
+be counted twice. The UI should say so wherever an event is dated this year.
 
 `YearResult` carries: year, per-person ages, gross income, per-person `ficaWages` (§3.4
 reads the prior year's), tax breakdown by type, the withdrawal penalty separately from tax,
@@ -2340,9 +2428,16 @@ Each of these falls out of the same engine, with no variant-specific entities.
 
 ### 9.1 Lean / Fat FIRE
 
-The same plan at a different standard of living. Because a `Scenario` varies `Assumptions`
-only (§3.10), this is a cloned `Household` with its `ExpenseItem`s adjusted, which moves
-`retirementAnnualExpenses` and the FIRE number built on it (§8.1).
+The same plan at a different standard of living, and it needs no new field.
+`ExpenseItem.phase` and `postRetirementAmount` (§3.7) already carry spending line by line
+across the retirement boundary. Fat FIRE is a `preRetirementOnly` car, a
+`postRetirementOnly` apartment, and a travel line whose `postRetirementAmount` is five times
+its working figure. Lean is the same instrument the other way.
+
+Keeping lean and fat side by side means two cloned `Household`s (§3.10), compared through
+§10.2. A single factor scaling all retirement spending was considered and rejected: it
+models a lifestyle nobody lives, since the point of the exercise is that housing may not
+move at all while travel quintuples.
 
 ### 9.2 Barista FIRE
 
@@ -2364,7 +2459,15 @@ real program would withhold part of it against those earnings, and raises
 
 ### 9.3 Coast FIRE
 
-Set `Contribution.endYear` on every account. The coast number is the balance today that
+Set `Contribution.endYear` on every account, **and omit the saving steps from that
+scenario's `contributionWaterfall`** (§4.4.4), leaving `highInterestDebt`,
+`cashBufferToTarget`, and `taxableBrokerage`. Both halves are needed. `Contribution` is only
+the committed flow, so stopping it hands the same money to the waterfall, which pours it
+back into the same accounts through steps 1, 2, 5, 6, and 7. Those steps gate on earned
+income, which retires a household out of them but not a coasting one, still working by
+definition.
+
+The coast number is the balance today that
 reaches the FIRE number with no further contributions, by the year each person reaches their
 `plannedRetirementAge` where one is set and by the household's solved `retirementYear` (§8.2)
 otherwise, and the coast number is itself `notReachable` where that is, there being no target
@@ -2376,9 +2479,9 @@ Reported as a **date**, interpolated within the crossing year. `coastingBalance(
 `afterTaxLiquidNetWorth` at `t` in a projection where every `Contribution` and the waterfall
 itself have both stopped, so balances grow only by their allocation's return. It is the
 after-tax measure because that is the side of §8.2 leg 1 the FIRE number is compared against
-(§8.1), and comparing a pre-tax balance to it would report a coast date years early. Stopping
-the contributions alone would leave the surplus they used to consume free for the waterfall
-to sweep into a brokerage account, and the balance would keep climbing on new money. The
+(§8.1), and comparing a pre-tax balance to it would report a coast date years early. The
+waterfall stops there for the same reason the plan above omits its saving steps, since a
+balance still climbing on new money is not a coasting one. The
 engine finds the first projected year `Y` reaching the target, then interpolates across it:
 
 ```
@@ -2402,6 +2505,25 @@ monthly fidelity, since it assumes the year's growth accrues smoothly. That assu
 safe here because the underlying quantity is a smooth compounding curve rather than a lumpy
 cash flow, which is why this is the one place the model reports sub-annual precision. It
 makes "you can stop contributing in March 2031" legible where "2031" is not.
+
+### 9.4 Traditional retirement
+
+`plannedRetirementAge` set to a traditional age, and nothing else. §6.1 takes that person
+out of the retirement-year solve entirely, the bridge period (§8.3) is empty, and no
+withdrawal is early enough to be penalised. It is the cheapest case the engine runs.
+
+What changes is the question being asked. Someone retiring at 67 is not choosing a date, so
+`fireNumber` answers something they never asked: it prices a standard of living they have
+already committed to a year for. They want the inverse, and §5 computes it.
+`sustainableLevelSpending` is what their projected balance will actually support, and
+`spendingHeadroom` is the annual distance between that and what they currently plan to
+spend. Both read at their retirement year, both in today's dollars (§1.1).
+
+The two measures answer for any household, and they are the headline only here. A household
+solving for a date reads `fireNumber` against `afterTaxLiquidNetWorth`; a household with the
+date already fixed reads the same comparison from the other end.
+
+---
 
 ## 10. Progress tracking and snapshots
 
@@ -2430,19 +2552,27 @@ v1.
 
 ### 10.2 Comparing snapshots
 
-A **comparison between any two snapshots for the same `scenarioId`** is computed on demand
-and is not itself a stored entity. Given an older and a newer `ProjectionSnapshot`, the
-comparison surfaces: Δ retirement year and Δ FIRE number, both per band, Δ net worth (all
-four measures), Δ savings rate, and the elapsed time between `asOfDate`s. Where either side
-of a per-band pair is `notReachable` the comparison names the transition rather than a
-difference, there being no arithmetic between a year and its absence. This powers a
-"your retirement date has moved from 2039 to 2038 since March" view, and a
-net-worth-over-time and retirement-date-over-time trend chart across all snapshots for a
-scenario.
+A **comparison between any two `ProjectionSnapshot`s** is computed on demand and is not
+itself a stored entity. It surfaces: Δ retirement year, Δ FIRE number and Δ sustainable
+level spending, all three per band, Δ net worth (all four measures), Δ savings rate, and the
+elapsed time between `asOfDate`s. A household with a fixed retirement date reads the third
+where one solving for a date reads the first (§9.4).
+Where either side of a per-band pair is `notReachable` the comparison names the transition
+rather than a difference, there being no arithmetic between a year and its absence. Within
+one `scenarioId` this powers a "your retirement date has moved from 2039 to 2038 since
+March" view, and a net-worth-over-time and retirement-date-over-time trend chart across
+that scenario's snapshots.
 
-A comparison across two different `taxYearId`s is still shown, and labeled: part of the delta
-is then a change in the bundled rules rather than a change in the plan, and attributing it to
-the household would be wrong.
+**The two sides need not share a scenario or a household**, and the comparison says what
+differs between them: each side's `Scenario.assumptions`, its `Household`, its `taxYearId`,
+or more than one at once.
+Comparing two cloned `Household`s is how a user sees one job against another (§3.10), and
+that comparison has no time axis, so the elapsed-time figure is omitted where the two
+`asOfDate`s are the same. A comparison whose sides differ in more than one of the three
+is shown and labeled, since attributing the delta to any single cause would be wrong.
+
+For `taxYearId` in particular, part of the delta is then a change in the bundled rules
+rather than a change in the plan, and attributing it to the household would be wrong.
 
 **This tells the user *that* their trajectory moved.** Decomposing a change into
 its drivers would require re-running the engine with mixed old and new inputs to isolate each
@@ -2588,6 +2718,9 @@ approximation in place of an accurate, expensive one.
 29. An `Account` whose `taxTreatment` is `roth` or `taxDeferred` has a `limitFamily` other
     than `none`. Both are stored, so a custom account could otherwise pair Roth treatment
     with an uncapped family and contribute without bound (§3.4.2).
+30. `Assumptions.contributionWaterfall` contains `taxableBrokerage`. Every other step may be
+    omitted, and Coast FIRE omits five of them (§9.3), but a waterfall with no terminal step
+    leaves a positive `netSurplus` unallocated with no account to hold it (§4.4.4).
 
 ## 13. Deferred
 

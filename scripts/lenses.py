@@ -79,11 +79,11 @@ def _ages():
             print(f"  STATED  {t[:96]}")
 
 
-@lens("spans-vs-points", "a rule written for date ranges is usually silent about point events")
+@lens("spans-vs-points", "a rule written for date ranges is usually silent about things dated to a year")
 def _sp():
     for m in re.finditer(r"[^.]*\b(startYear|endYear|prorat\w+|active this year)\b[^.]*\.", prose):
         print(f"  SPAN RULE  {' '.join(m.group(0).split())[:96]}")
-    print("\n  point-event fields to test each rule against:")
+    print("\n  year-dated fields to test each rule against:")
     print("    OneTimeEvent.year · Asset.acquisitionYear · Asset.plannedSaleYear")
 
 

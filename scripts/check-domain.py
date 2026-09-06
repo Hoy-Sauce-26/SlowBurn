@@ -308,6 +308,64 @@ for b in blocks:
 fail("statutory number in a formula rather than TaxYear (§3.12)",
      sorted(dict.fromkeys(literals)))
 
+# --- 19. an entity declaring its fields in a prose list instead of a table ----
+# Scenario and AssetClass both did.  A prose list has no type column, so
+# nullability goes unstated and the field is invisible to checks 8 and 20.
+ent_heads = [(i, m) for i, l in enumerate(lines)
+             if (m := re.match(r"^#{3,4} (3(?:\.\d+)*) (.+)", l))]
+prose_decl = []
+for k, (i, m) in enumerate(ent_heads):
+    if m.group(1) == "3.12":          # reference data, a bulleted list by design
+        continue
+    end = (ent_heads[k + 1][0] if k + 1 < len(ent_heads)
+           else next(j for j in range(i, len(lines)) if lines[j].startswith("## 4.")))
+    if not any(l.startswith("| `") for l in lines[i:end]):
+        prose_decl.append(f"§{m.group(1)} {m.group(2)}")
+fail("entity section declaring its fields outside a table", prose_decl)
+
+# --- 20. a field discussed in an entity section and declared in no table ------
+# Person.retirementYear and Liability.principalAndInterest were both defined
+# only in prose, one of them inside another field's note.  Check 8 cannot see
+# them: it only resolves references already written as `Entity.field`.
+tfields = set()
+for l in lines:
+    m = re.match(r"^\| (`[^|]+`)\s*\|", l)
+    if m:
+        tfields |= set(re.findall(r"`([a-zA-Z][A-Za-z0-9_]*)`", m.group(1)))
+evals = set()
+for l in lines:
+    m = re.match(r"^\| `[^`]+`[^|]*\|\s*enum[^|]*\|(.*)$", l)
+    if m:
+        evals |= set(re.findall(r"`([a-zA-Z][A-Za-z0-9_]*)`", m.group(1)))
+refdata = set()
+for blk in (ty.group(1) if ty else "",
+            (lambda a: a.group(1) if a else "")(
+                re.search(r"\*\*Assumptions\*\* \(per `Scenario`\):(.*?)\n### 3\.10", src, re.S))):
+    for tok in re.findall(r"`([^`]+)`", blk):
+        refdata |= set(re.findall(r"[a-zA-Z][A-Za-z0-9_]*", tok))
+fvars = set()
+for b in blocks:
+    fvars |= set(re.findall(r"^\s*([a-zA-Z][A-Za-z0-9_]*)\s*[,=]", b, re.M))
+    fvars |= set(re.findall(r"\b([a-zA-Z][A-Za-z0-9_]*)\s*=", b))
+# vocabularies declared as ordered lists (WaterfallStep, WithdrawalSource)
+vocab  = set(re.findall(r"^- `([a-z][A-Za-z0-9_]*)`:", src, re.M))
+vocab |= set(re.findall(r"^\d+\. `([a-z][A-Za-z0-9_]*)`", src, re.M))
+KNOWN = tfields | evals | refdata | fvars | set(FLAGS) | vocab | {"notReachable", "alreadyCoasting"}
+heads = [(i, m) for i, l in enumerate(lines) if (m := re.match(r"^#{3,4} (3(?:\.\d+)*) ", l))]
+undeclared = []
+for k, (i, m) in enumerate(heads):
+    if m.group(1) == "3.12":
+        continue
+    end = (heads[k + 1][0] if k + 1 < len(heads)
+           else next(j for j in range(i, len(lines)) if lines[j].startswith("## 4.")))
+    body = "\n".join(lines[i + 1:end])
+    body = re.sub(r"```.*?```", "", body, flags=re.S)
+    body = re.sub(r"^\|.*$", "", body, flags=re.M)
+    for x in sorted({x for x in re.findall(r"`([a-z][A-Za-z0-9_]*)`", body)
+                     if x not in KNOWN and re.search(r"[a-z][A-Z]", x)}):
+        undeclared.append(f"§{m.group(1)}: {x}")
+fail("field discussed in an entity section but declared in no table", undeclared)
+
 # --- report -------------------------------------------------------------------
 for label, items in fails:
     print(f"FAIL  {label}")

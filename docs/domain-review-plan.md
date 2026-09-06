@@ -67,10 +67,14 @@ what made the yield depend on the reviewer. Four scripts hold them:
 - `scripts/check.py` — the entry point. Runs the three below and prints one verdict, `PASS`
   or `FAIL`, exiting 1 on a fail. Only the gate decides it; the other two say what to read.
   `--quiet` prints the verdict alone.
-- `scripts/check-domain.py` — 18 hard checks. Exit 1 on anything a script can prove wrong.
-  Run after every edit. Two came from decisions the document made later: a `| Field |`
-  table with no entity name above it, and a statutory number written into a formula
-  instead of `TaxYear` (§3.12). Both are silent when clean, so neither is a lens.
+- `scripts/check-domain.py` — 20 hard checks. Exit 1 on anything a script can prove wrong.
+  Run after every edit. Four came from decisions the document made later: a `| Field |`
+  table with no entity name above it, a statutory number written into a formula instead of
+  `TaxYear` (§3.12), an entity section declaring its fields outside a table, and a field
+  discussed in an entity section but declared in no table. All are silent when clean, so
+  none is a lens. The last two exist because that defect appeared four separate times:
+  `Person.retirementYear`, `Liability.principalAndInterest`, the `Scenario` entity, and an
+  `originationDate` / `termMonths` row carrying two fields at once.
 - `scripts/lenses.py` — 14 survey lenses over the categories where defects actually turned
   up: counted claims, one-sided guards, divisions, `??` fallbacks, age thresholds,
   span-versus-point rules, dichotomies, sentinels, deferral direction, UI obligations, field
