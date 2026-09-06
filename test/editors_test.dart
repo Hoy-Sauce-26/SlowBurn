@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:burn_engine/burn_engine.dart';
@@ -427,8 +428,23 @@ void main() {
     testWidgets('says so when a state has no bundled rules yet',
         (tester) async {
       // A zero that means "we do not know" must not look like a zero that
-      // means "no tax here".
-      final container = await pumpApp(tester, household: withPerson());
+      // means "no tax here". The bundled 2026 ruleset now covers every state,
+      // so this is checked against a ruleset with one taken out.
+      final gappy = jsonDecode(File('assets/tax_years/2026.json')
+          .readAsStringSync()) as Map<String, dynamic>;
+      (gappy['stateRules'] as Map<String, dynamic>).remove('MI');
+
+      final container = ProviderContainer(overrides: [
+        taxYearProvider.overrideWith((ref) => parseTaxYear(jsonEncode(gappy))),
+        householdProvider.overrideWith(() => _Fixed(withPerson())),
+      ]);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: lightTheme(), home: const HomeShell()),
+      ));
+      await tester.pump();
+
       container.read(householdProvider.notifier).saveTaxUnit(TaxUnit(
             id: 'tu1',
             householdId: 'h1',
@@ -439,9 +455,20 @@ void main() {
       expect(find.textContaining('do not have Michigan'), findsOneWidget);
     });
 
-    testWidgets('says nothing for a state we do have', (tester) async {
-      await pumpApp(tester, household: withPerson());
-      expect(find.textContaining('do not have'), findsNothing);
+    testWidgets('says nothing for any state, now that all of them are in',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      for (final code in usStateCodes.keys) {
+        container.read(householdProvider.notifier).saveTaxUnit(TaxUnit(
+              id: 'tu1',
+              householdId: 'h1',
+              filingStatus: FilingStatus.single,
+              stateCode: code,
+            ));
+        await tester.pump();
+        expect(find.textContaining('do not have'), findsNothing,
+            reason: '$code has no bundled rules');
+      }
     });
   });
 

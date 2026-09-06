@@ -146,28 +146,44 @@ class IrmaaBracket {
 /// A state's or locality's own schedule (§3.12).
 class JurisdictionRules {
   final String code;
-  final List<TaxBracket> brackets;
+
+  /// Schedules by filing status. States that publish one schedule for everyone
+  /// carry the same list under every status, and a status with no schedule of
+  /// its own falls back to the single one (§4.3.6).
+  final Map<FilingStatus, List<TaxBracket>> brackets;
   final Rate? flatRate;
-  final Money standardDeduction;
-  final Money personalExemption;
+  final Map<FilingStatus, Money> standardDeduction;
+  final Map<FilingStatus, Money> personalExemption;
 
   /// Whether this jurisdiction follows the federal treatment of pre-tax
   /// deferrals. False for Pennsylvania and similar (§4.3.3).
   final bool conformsToPreTaxDeferrals;
 
-  final Money retirementIncomeExclusion;
+  final Map<FilingStatus, Money> retirementIncomeExclusion;
 
   const JurisdictionRules({
     required this.code,
-    this.brackets = const [],
+    this.brackets = const {},
     this.flatRate,
-    this.standardDeduction = Money.zero,
-    this.personalExemption = Money.zero,
+    this.standardDeduction = const {},
+    this.personalExemption = const {},
     this.conformsToPreTaxDeferrals = true,
-    this.retirementIncomeExclusion = Money.zero,
+    this.retirementIncomeExclusion = const {},
   });
 
-  bool get leviesNoIncomeTax => brackets.isEmpty && (flatRate ?? 0) == 0;
+  List<TaxBracket> bracketsFor(FilingStatus status) =>
+      brackets[status] ?? brackets[FilingStatus.single] ?? const [];
+
+  Money standardDeductionFor(FilingStatus status) => _amount(standardDeduction, status);
+  Money personalExemptionFor(FilingStatus status) => _amount(personalExemption, status);
+  Money retirementIncomeExclusionFor(FilingStatus status) =>
+      _amount(retirementIncomeExclusion, status);
+
+  static Money _amount(Map<FilingStatus, Money> by, FilingStatus status) =>
+      by[status] ?? by[FilingStatus.single] ?? Money.zero;
+
+  bool get leviesNoIncomeTax =>
+      (flatRate ?? 0) == 0 && brackets.values.every((b) => b.isEmpty);
 }
 
 /// The whole ruleset for one tax year.

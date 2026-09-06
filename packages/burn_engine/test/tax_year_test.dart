@@ -59,6 +59,74 @@ void main() {
     });
   });
 
+  group('the state layer', () {
+    test('covers every state and DC, so no household is unpriced', () {
+      expect(ty.stateRules, hasLength(51));
+      expect(ty.stateRules.containsKey('DC'), isTrue);
+      expect(ty.stateRules.containsKey('PR'), isFalse);
+    });
+
+    test('the nine states with no income tax charge nothing', () {
+      for (final code in ['AK', 'FL', 'NV', 'NH', 'SD', 'TN', 'TX', 'WY', 'WA']) {
+        expect(ty.stateRules[code]!.leviesNoIncomeTax, isTrue,
+            reason: '$code levies no broad income tax');
+      }
+    });
+
+    test('every schedule rises, and every bracket is a real rate', () {
+      for (final rules in ty.stateRules.values) {
+        for (final status in FilingStatus.values) {
+          final brackets = rules.bracketsFor(status);
+          Money? previous;
+          for (final b in brackets) {
+            expect(b.rate, inInclusiveRange(0, 0.15),
+                reason: '${rules.code} has a rate outside anything a state '
+                    'charges');
+            if (b.upTo != null && previous != null) {
+              expect(b.upTo!.cents, greaterThan(previous.cents),
+                  reason: '${rules.code} has a bracket that does not rise');
+            }
+            if (b.upTo != null) previous = b.upTo;
+          }
+          if (brackets.isNotEmpty) {
+            expect(brackets.last.upTo, isNull,
+                reason: '${rules.code} leaves its top bracket bounded, so the '
+                    'highest earners fall off the end of it');
+          }
+        }
+      }
+    });
+
+    test('a married couple is not taxed on a single filer schedule', () {
+      // The whole point of splitting the schedules: California's 9.3% starts
+      // at twice the income for a couple, and getting that wrong overstates
+      // state tax for most households in the app.
+      final ca = ty.stateRules['CA']!;
+      final single = ca.bracketsFor(FilingStatus.single);
+      final joint = ca.bracketsFor(FilingStatus.marriedFilingJointly);
+      expect(joint[1].upTo!.cents, greaterThan(single[1].upTo!.cents));
+      expect(ca.standardDeductionFor(FilingStatus.marriedFilingJointly).cents,
+          ca.standardDeductionFor(FilingStatus.single).cents * 2);
+    });
+
+    test('filing separately follows the single schedule', () {
+      final ny = ty.stateRules['NY']!;
+      expect(ny.bracketsFor(FilingStatus.marriedFilingSeparately),
+          ny.bracketsFor(FilingStatus.single));
+      expect(ny.bracketsFor(FilingStatus.qualifyingSurvivingSpouse),
+          ny.bracketsFor(FilingStatus.marriedFilingJointly));
+    });
+
+    test('a state that exempts its first dollars starts at zero', () {
+      // Mississippi charges nothing below $10,000 and 4% above it, and a
+      // flat 4% would tax income the state does not reach.
+      final ms = ty.stateRules['MS']!.bracketsFor(FilingStatus.single);
+      expect(ms.first.rate, 0);
+      expect(ms.first.upTo, Money.dollars(10000));
+      expect(ms.last.rate, 0.04);
+    });
+  });
+
   group('lookups that run past their last row (§3.12)', () {
     test('the RMD table saturates rather than running off the end', () {
       expect(ty.rmdDivisorFor(90), 12.2);

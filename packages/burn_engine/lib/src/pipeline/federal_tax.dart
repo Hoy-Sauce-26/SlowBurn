@@ -212,6 +212,7 @@ TaxOwed computeTaxOwed(
   final stateTax = _jurisdictionTax(
     taxYear.stateRules[unit.stateCode],
     income: income,
+    status: unit.filingStatus,
     unitAccounts: household.accounts
         .where((a) => personIds.contains(a.personId))
         .toList(),
@@ -221,6 +222,7 @@ TaxOwed computeTaxOwed(
       : _jurisdictionTax(
           taxYear.localRules[unit.localityCode],
           income: income,
+          status: unit.filingStatus,
           unitAccounts: household.accounts
               .where((a) => personIds.contains(a.personId))
               .toList(),
@@ -337,6 +339,7 @@ Money _jurisdictionTax(
   JurisdictionRules? rules, {
   required TaxableIncome income,
   required List<Account> unitAccounts,
+  required FilingStatus status,
 }) {
   if (rules == null || rules.leviesNoIncomeTax) return Money.zero;
 
@@ -349,13 +352,13 @@ Money _jurisdictionTax(
             : 0)));
   }
   final taxable = (base -
-          rules.standardDeduction -
-          rules.personalExemption -
-          rules.retirementIncomeExclusion)
+          rules.standardDeductionFor(status) -
+          rules.personalExemptionFor(status) -
+          rules.retirementIncomeExclusionFor(status))
       .orZeroIfNegative;
 
   if (rules.flatRate != null) return taxable * rules.flatRate!;
-  return applyBrackets(taxable, rules.brackets);
+  return applyBrackets(taxable, rules.bracketsFor(status));
 }
 
 Money _minOf(List<Money> values) =>

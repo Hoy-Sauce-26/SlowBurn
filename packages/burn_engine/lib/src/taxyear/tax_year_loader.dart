@@ -209,18 +209,42 @@ Map<String, JurisdictionRules> _jurisdictions(dynamic v) =>
           code,
           JurisdictionRules(
             code: code,
-            brackets: r['brackets'] == null ? const [] : _brackets(r['brackets']),
+            brackets:
+                _jurisdictionByStatus<List<TaxBracket>>(r['brackets'], _brackets),
             flatRate: r['flatRate'] == null ? null : _rate(r['flatRate']),
-            standardDeduction: r['standardDeduction'] == null
-                ? Money.zero
-                : _money(r['standardDeduction']),
-            personalExemption: r['personalExemption'] == null
-                ? Money.zero
-                : _money(r['personalExemption']),
+            standardDeduction:
+                _jurisdictionByStatus<Money>(r['standardDeduction'], _money),
+            personalExemption:
+                _jurisdictionByStatus<Money>(r['personalExemption'], _money),
             conformsToPreTaxDeferrals:
                 r['conformsToPreTaxDeferrals'] as bool? ?? true,
-            retirementIncomeExclusion: r['retirementIncomeExclusion'] == null
-                ? Money.zero
-                : _money(r['retirementIncomeExclusion']),
+            retirementIncomeExclusion:
+                _jurisdictionByStatus<Money>(
+                    r['retirementIncomeExclusion'], _money),
           ),
         ));
+
+/// A jurisdiction figure is either one value for everybody, or a `single` and
+/// a `married` pair. Filing separately and heads of household follow the single
+/// schedule, which is what most states do and the conservative reading where
+/// they do not.
+Map<FilingStatus, T> _jurisdictionByStatus<T>(dynamic v, T Function(dynamic) parse) {
+  if (v == null) return const {};
+  if (v is! Map<String, dynamic>) {
+    final one = parse(v);
+    return {for (final s in FilingStatus.values) s: one};
+  }
+  if (!v.containsKey('single')) {
+    throw const TaxYearFormatException(
+        'a jurisdiction figure split by status needs at least "single"');
+  }
+  final single = parse(v['single']);
+  final married = v['married'] == null ? single : parse(v['married']);
+  return {
+    FilingStatus.single: single,
+    FilingStatus.marriedFilingSeparately: single,
+    FilingStatus.headOfHousehold: single,
+    FilingStatus.marriedFilingJointly: married,
+    FilingStatus.qualifyingSurvivingSpouse: married,
+  };
+}

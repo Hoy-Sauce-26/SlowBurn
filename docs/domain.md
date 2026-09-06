@@ -1444,10 +1444,11 @@ The state and locality layers, then everything above summed into one figure the 
 spends.
 
 ```
-stateTax        = brackets or flat rate from TaxYear.stateRules[stateCode], applied to
-                  federalAgi adjusted by that state's conformity flags, less its own
-                  standard deduction, personal exemptions, and retirement-income
-                  exclusions, and zero in the states that levy none
+stateTax        = brackets or flat rate for this TaxUnit's filingStatus, from
+                  TaxYear.stateRules[stateCode], applied to federalAgi adjusted by that
+                  state's conformity flags, less its own standard deduction, personal
+                  exemptions, and retirement-income exclusions, and zero in the states
+                  that levy none
 localTax        = the same shape against TaxYear.localRules[localityCode];
                   0 where localityCode is null
 ```
@@ -1457,6 +1458,10 @@ deduction, exemptions, and retirement-income exclusions. The conformity flags ar
 a state diverge on pre-tax deferrals (§3.4.3). Nine states levy no income tax, several are
 flat, and localities such as NYC, Philadelphia, Ohio municipalities, and Maryland counties
 add their own layer.
+
+Schedules are held per filing status, because most states widen their brackets for a joint
+return and reading a single filer's schedule for a couple overstates what they owe. A state
+that publishes one schedule for everybody carries the same one under each status.
 
 ```
 withdrawalPenalty = Σ over this TaxUnit's draws this year (§8.4.1):

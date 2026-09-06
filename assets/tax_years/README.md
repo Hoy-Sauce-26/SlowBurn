@@ -35,8 +35,49 @@ inflation-adjusted figure. Check each against the IRS revenue procedure for
   national average, and `acaApplicablePercentageTable`
 - `irmaaBrackets`, and note they are currently the same for every filing status
 - `rmdAgeByBirthYear` and `rmdDivisorTable`
-- `stateRules`, which covers nine no-tax states plus CO, PA and CA only
+- the federal half of this file is still on 2025 figures, one year behind
+  `stateRules` below. Refreshing it is the next data job.
 
 Until that check happens, treat any number the app shows as directionally right
 and precisely wrong. §7.5's staleness posture applies: the app should say which
 ruleset produced a figure.
+
+## The state layer
+
+`stateRules` covers all fifty states and the District of Columbia, taken from
+the Tax Foundation's *2026 State Individual Income Tax Rates and Brackets*,
+read on 6 September 2026. Nine states levy no broad income tax and carry an
+empty schedule.
+
+Rates and brackets are split by filing status. A jurisdiction figure is written
+either as one value for everybody, or as a `single` and `married` pair, and
+filing separately and heads of household follow the single schedule. That is
+what most states do, and it is the conservative reading where they do not:
+several states give a head of household a wider schedule than a single filer,
+so those households are shown slightly more state tax than they will owe.
+
+What the model does not yet carry, in rough order of how much it costs a
+household:
+
+- **Retirement income exclusions.** Illinois, Pennsylvania and Mississippi
+  exempt retirement income almost entirely, and around thirty states exclude
+  part of it, usually with an age or income test. `retirementIncomeExclusion`
+  exists but is subtracted from all income rather than from retirement income,
+  so it is left at zero everywhere until it can be applied to the right
+  dollars. Retirees in those states are shown more state tax than they owe.
+- **Social Security.** Most states exempt it and the state layer runs off
+  federal AGI, which includes whatever part of it is federally taxable.
+- **Credits.** Arizona, Arkansas, California, Delaware, Iowa, Nebraska, Oregon
+  and Utah give a personal credit rather than an exemption, and the model has
+  only exemptions. Those credits are dropped, which overstates their tax a
+  little.
+- **Phase-outs.** Connecticut, Rhode Island and others taper the personal
+  exemption away as income rises, and Wisconsin tapers its standard deduction.
+  Both are carried flat here, which understates tax at high incomes.
+- **Washington's capital gains tax**, 7% above a large exclusion, has no home in
+  a model whose state layer runs on ordinary income. Washington is carried as a
+  no-income-tax state, which is right for wages and wrong for a large sale.
+- **Connecticut's joint schedule** was reconstructed by doubling its single
+  brackets, because the source table skipped a rate.
+- **Local income tax.** `localRules` is still empty, and New York City, Maryland
+  counties and Ohio municipalities all levy their own.

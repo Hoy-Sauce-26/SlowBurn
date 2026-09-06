@@ -268,7 +268,23 @@ void main() {
       final r = run(h);
       final co = taxYear.stateRules['CO']!;
       expect(r.owed.stateTax,
-          (r.income.federalAgi - co.standardDeduction) * co.flatRate!);
+          (r.income.federalAgi - co.standardDeductionFor(FilingStatus.single)) *
+              co.flatRate!);
+    });
+
+    test('a couple is taxed on the couple\'s schedule', () {
+      // California's brackets are twice as wide for a joint return, so the
+      // same income owes less. Reading a single filer's schedule for a married
+      // household was the error the per-status split exists to prevent.
+      Money owed(FilingStatus status) => run(Household(
+            id: 'h1',
+            taxUnits: [taxUnit(state: 'CA', filingStatus: status)],
+            people: [person()],
+            incomeStreams: [salary(pay: 150000)],
+          )).owed.stateTax;
+
+      expect(owed(FilingStatus.marriedFilingJointly).cents,
+          lessThan(owed(FilingStatus.single).cents));
     });
 
     test('a non-conforming state adds pre-tax deferrals back', () {

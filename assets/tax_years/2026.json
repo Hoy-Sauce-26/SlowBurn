@@ -1,7 +1,7 @@
 {
  "id": "us-2026",
  "year": 2026,
- "_provenance": "PROVISIONAL. Statutory figures (marked indexed:false) are fixed by law and stable. Inflation-adjusted figures are estimates and must be checked against the IRS revenue procedure for 2026 before release. See README.md.",
+ "_provenance": "PROVISIONAL. Statutory figures (marked indexed:false) are fixed by law and stable. Federal inflation-adjusted figures are 2025 estimates and must be checked against the IRS revenue procedure for 2026 before release. stateRules is the Tax Foundation 2026 table, read 6 September 2026, and omits credits, retirement-income exclusions and local tax. See README.md.",
  "federalBrackets": {
   "single": [
    {
@@ -1029,81 +1029,1442 @@
  "unrecapturedSection1250Rate": 0.25,
  "residentialDepreciationYears": 27.5,
  "stateRules": {
-  "TX": {
+  "AK": {
    "brackets": []
+  },
+  "AL": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 50000,
+      "rate": 0.02
+     },
+     {
+      "upTo": 300000,
+      "rate": 0.04
+     },
+     {
+      "upTo": null,
+      "rate": 0.05
+     }
+    ],
+    "married": [
+     {
+      "upTo": 100000,
+      "rate": 0.02
+     },
+     {
+      "upTo": 600000,
+      "rate": 0.04
+     },
+     {
+      "upTo": null,
+      "rate": 0.05
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 300000,
+    "married": 850000
+   },
+   "personalExemption": {
+    "single": 150000,
+    "married": 300000
+   }
+  },
+  "AR": {
+   "brackets": [
+    {
+     "upTo": 460000,
+     "rate": 0.02
+    },
+    {
+     "upTo": null,
+     "rate": 0.039
+    }
+   ],
+   "standardDeduction": {
+    "single": 247000,
+    "married": 494000
+   }
+  },
+  "AZ": {
+   "flatRate": 0.025,
+   "standardDeduction": {
+    "single": 835000,
+    "married": 1670000
+   }
+  },
+  "CA": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 1107900,
+      "rate": 0.01
+     },
+     {
+      "upTo": 2626400,
+      "rate": 0.02
+     },
+     {
+      "upTo": 4145200,
+      "rate": 0.04
+     },
+     {
+      "upTo": 5754200,
+      "rate": 0.06
+     },
+     {
+      "upTo": 7272400,
+      "rate": 0.08
+     },
+     {
+      "upTo": 37147900,
+      "rate": 0.093
+     },
+     {
+      "upTo": 44577100,
+      "rate": 0.103
+     },
+     {
+      "upTo": 74295300,
+      "rate": 0.113
+     },
+     {
+      "upTo": 100000000,
+      "rate": 0.123
+     },
+     {
+      "upTo": null,
+      "rate": 0.133
+     }
+    ],
+    "married": [
+     {
+      "upTo": 2215800,
+      "rate": 0.01
+     },
+     {
+      "upTo": 5252800,
+      "rate": 0.02
+     },
+     {
+      "upTo": 8290400,
+      "rate": 0.04
+     },
+     {
+      "upTo": 11508400,
+      "rate": 0.06
+     },
+     {
+      "upTo": 14544800,
+      "rate": 0.08
+     },
+     {
+      "upTo": 74295800,
+      "rate": 0.093
+     },
+     {
+      "upTo": 89154200,
+      "rate": 0.103
+     },
+     {
+      "upTo": 100000000,
+      "rate": 0.113
+     },
+     {
+      "upTo": 148590600,
+      "rate": 0.123
+     },
+     {
+      "upTo": null,
+      "rate": 0.133
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 554000,
+    "married": 1108000
+   }
+  },
+  "CO": {
+   "flatRate": 0.044,
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
+  },
+  "CT": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 1000000,
+      "rate": 0.02
+     },
+     {
+      "upTo": 5000000,
+      "rate": 0.045
+     },
+     {
+      "upTo": 10000000,
+      "rate": 0.055
+     },
+     {
+      "upTo": 20000000,
+      "rate": 0.06
+     },
+     {
+      "upTo": 25000000,
+      "rate": 0.065
+     },
+     {
+      "upTo": 50000000,
+      "rate": 0.069
+     },
+     {
+      "upTo": null,
+      "rate": 0.0699
+     }
+    ],
+    "married": [
+     {
+      "upTo": 2000000,
+      "rate": 0.02
+     },
+     {
+      "upTo": 10000000,
+      "rate": 0.045
+     },
+     {
+      "upTo": 20000000,
+      "rate": 0.055
+     },
+     {
+      "upTo": 40000000,
+      "rate": 0.06
+     },
+     {
+      "upTo": 50000000,
+      "rate": 0.065
+     },
+     {
+      "upTo": 100000000,
+      "rate": 0.069
+     },
+     {
+      "upTo": null,
+      "rate": 0.0699
+     }
+    ]
+   },
+   "personalExemption": {
+    "single": 1500000,
+    "married": 2400000
+   }
+  },
+  "DC": {
+   "brackets": [
+    {
+     "upTo": 1000000,
+     "rate": 0.04
+    },
+    {
+     "upTo": 4000000,
+     "rate": 0.06
+    },
+    {
+     "upTo": 6000000,
+     "rate": 0.065
+    },
+    {
+     "upTo": 25000000,
+     "rate": 0.085
+    },
+    {
+     "upTo": 50000000,
+     "rate": 0.0925
+    },
+    {
+     "upTo": 100000000,
+     "rate": 0.0975
+    },
+    {
+     "upTo": null,
+     "rate": 0.1075
+    }
+   ],
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
+  },
+  "DE": {
+   "brackets": [
+    {
+     "upTo": 200000,
+     "rate": 0.0
+    },
+    {
+     "upTo": 500000,
+     "rate": 0.022
+    },
+    {
+     "upTo": 1000000,
+     "rate": 0.039
+    },
+    {
+     "upTo": 2000000,
+     "rate": 0.048
+    },
+    {
+     "upTo": 2500000,
+     "rate": 0.052
+    },
+    {
+     "upTo": 6000000,
+     "rate": 0.0555
+    },
+    {
+     "upTo": null,
+     "rate": 0.066
+    }
+   ],
+   "standardDeduction": {
+    "single": 325000,
+    "married": 650000
+   }
   },
   "FL": {
    "brackets": []
   },
-  "WA": {
-   "brackets": []
+  "GA": {
+   "flatRate": 0.0519,
+   "standardDeduction": {
+    "single": 1200000,
+    "married": 2400000
+   }
   },
-  "NV": {
-   "brackets": []
+  "HI": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 960000,
+      "rate": 0.014
+     },
+     {
+      "upTo": 1440000,
+      "rate": 0.032
+     },
+     {
+      "upTo": 1920000,
+      "rate": 0.055
+     },
+     {
+      "upTo": 2400000,
+      "rate": 0.064
+     },
+     {
+      "upTo": 3600000,
+      "rate": 0.068
+     },
+     {
+      "upTo": 4800000,
+      "rate": 0.072
+     },
+     {
+      "upTo": 12500000,
+      "rate": 0.076
+     },
+     {
+      "upTo": 17500000,
+      "rate": 0.079
+     },
+     {
+      "upTo": 22500000,
+      "rate": 0.0825
+     },
+     {
+      "upTo": 27500000,
+      "rate": 0.09
+     },
+     {
+      "upTo": 32500000,
+      "rate": 0.1
+     },
+     {
+      "upTo": null,
+      "rate": 0.11
+     }
+    ],
+    "married": [
+     {
+      "upTo": 1920000,
+      "rate": 0.014
+     },
+     {
+      "upTo": 2880000,
+      "rate": 0.032
+     },
+     {
+      "upTo": 3840000,
+      "rate": 0.055
+     },
+     {
+      "upTo": 4800000,
+      "rate": 0.064
+     },
+     {
+      "upTo": 7200000,
+      "rate": 0.068
+     },
+     {
+      "upTo": 9600000,
+      "rate": 0.072
+     },
+     {
+      "upTo": 25000000,
+      "rate": 0.076
+     },
+     {
+      "upTo": 35000000,
+      "rate": 0.079
+     },
+     {
+      "upTo": 45000000,
+      "rate": 0.0825
+     },
+     {
+      "upTo": 55000000,
+      "rate": 0.09
+     },
+     {
+      "upTo": 65000000,
+      "rate": 0.1
+     },
+     {
+      "upTo": null,
+      "rate": 0.11
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 440000,
+    "married": 880000
+   },
+   "personalExemption": {
+    "single": 114400,
+    "married": 228800
+   }
   },
-  "TN": {
-   "brackets": []
+  "IA": {
+   "flatRate": 0.038,
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
   },
-  "WY": {
-   "brackets": []
+  "ID": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 481100,
+      "rate": 0.0
+     },
+     {
+      "upTo": null,
+      "rate": 0.053
+     }
+    ],
+    "married": [
+     {
+      "upTo": 962200,
+      "rate": 0.0
+     },
+     {
+      "upTo": null,
+      "rate": 0.053
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
   },
-  "SD": {
-   "brackets": []
+  "IL": {
+   "flatRate": 0.0495,
+   "personalExemption": {
+    "single": 292500,
+    "married": 585000
+   }
   },
-  "AK": {
-   "brackets": []
+  "IN": {
+   "flatRate": 0.0295,
+   "personalExemption": {
+    "single": 100000,
+    "married": 200000
+   }
+  },
+  "KS": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 2300000,
+      "rate": 0.052
+     },
+     {
+      "upTo": null,
+      "rate": 0.0558
+     }
+    ],
+    "married": [
+     {
+      "upTo": 4600000,
+      "rate": 0.052
+     },
+     {
+      "upTo": null,
+      "rate": 0.0558
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 360500,
+    "married": 824000
+   },
+   "personalExemption": {
+    "single": 916000,
+    "married": 1832000
+   }
+  },
+  "KY": {
+   "flatRate": 0.035,
+   "standardDeduction": 336000
+  },
+  "LA": {
+   "flatRate": 0.03,
+   "standardDeduction": {
+    "single": 1287500,
+    "married": 2575000
+   }
+  },
+  "MA": {
+   "brackets": [
+    {
+     "upTo": 108315000,
+     "rate": 0.05
+    },
+    {
+     "upTo": null,
+     "rate": 0.09
+    }
+   ],
+   "personalExemption": {
+    "single": 440000,
+    "married": 880000
+   }
+  },
+  "MD": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 100000,
+      "rate": 0.02
+     },
+     {
+      "upTo": 200000,
+      "rate": 0.03
+     },
+     {
+      "upTo": 300000,
+      "rate": 0.04
+     },
+     {
+      "upTo": 10000000,
+      "rate": 0.0475
+     },
+     {
+      "upTo": 12500000,
+      "rate": 0.05
+     },
+     {
+      "upTo": 15000000,
+      "rate": 0.0525
+     },
+     {
+      "upTo": 25000000,
+      "rate": 0.055
+     },
+     {
+      "upTo": 50000000,
+      "rate": 0.0575
+     },
+     {
+      "upTo": 100000000,
+      "rate": 0.0625
+     },
+     {
+      "upTo": null,
+      "rate": 0.065
+     }
+    ],
+    "married": [
+     {
+      "upTo": 100000,
+      "rate": 0.02
+     },
+     {
+      "upTo": 200000,
+      "rate": 0.03
+     },
+     {
+      "upTo": 300000,
+      "rate": 0.04
+     },
+     {
+      "upTo": 15000000,
+      "rate": 0.0475
+     },
+     {
+      "upTo": 17500000,
+      "rate": 0.05
+     },
+     {
+      "upTo": 22500000,
+      "rate": 0.0525
+     },
+     {
+      "upTo": 30000000,
+      "rate": 0.055
+     },
+     {
+      "upTo": 60000000,
+      "rate": 0.0575
+     },
+     {
+      "upTo": 120000000,
+      "rate": 0.0625
+     },
+     {
+      "upTo": null,
+      "rate": 0.065
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 335000,
+    "married": 670000
+   },
+   "personalExemption": {
+    "single": 320000,
+    "married": 640000
+   }
+  },
+  "ME": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 2739900,
+      "rate": 0.058
+     },
+     {
+      "upTo": 6484900,
+      "rate": 0.0675
+     },
+     {
+      "upTo": null,
+      "rate": 0.0715
+     }
+    ],
+    "married": [
+     {
+      "upTo": 5484900,
+      "rate": 0.058
+     },
+     {
+      "upTo": 12974900,
+      "rate": 0.0675
+     },
+     {
+      "upTo": null,
+      "rate": 0.0715
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 835000,
+    "married": 1670000
+   },
+   "personalExemption": {
+    "single": 530000,
+    "married": 1060000
+   }
+  },
+  "MI": {
+   "flatRate": 0.0425,
+   "personalExemption": {
+    "single": 590000,
+    "married": 1180000
+   }
+  },
+  "MN": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 3331000,
+      "rate": 0.0535
+     },
+     {
+      "upTo": 10943000,
+      "rate": 0.068
+     },
+     {
+      "upTo": 20315000,
+      "rate": 0.0785
+     },
+     {
+      "upTo": null,
+      "rate": 0.0985
+     }
+    ],
+    "married": [
+     {
+      "upTo": 4870000,
+      "rate": 0.0535
+     },
+     {
+      "upTo": 19348000,
+      "rate": 0.068
+     },
+     {
+      "upTo": 33793000,
+      "rate": 0.0785
+     },
+     {
+      "upTo": null,
+      "rate": 0.0985
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 1530000,
+    "married": 3060000
+   }
+  },
+  "MO": {
+   "brackets": [
+    {
+     "upTo": 134800,
+     "rate": 0.0
+    },
+    {
+     "upTo": 269600,
+     "rate": 0.02
+    },
+    {
+     "upTo": 404400,
+     "rate": 0.025
+    },
+    {
+     "upTo": 539200,
+     "rate": 0.03
+    },
+    {
+     "upTo": 674000,
+     "rate": 0.035
+    },
+    {
+     "upTo": 808800,
+     "rate": 0.04
+    },
+    {
+     "upTo": 943600,
+     "rate": 0.045
+    },
+    {
+     "upTo": null,
+     "rate": 0.047
+    }
+   ],
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
+  },
+  "MS": {
+   "brackets": [
+    {
+     "upTo": 1000000,
+     "rate": 0.0
+    },
+    {
+     "upTo": null,
+     "rate": 0.04
+    }
+   ],
+   "standardDeduction": {
+    "single": 230000,
+    "married": 460000
+   },
+   "personalExemption": {
+    "single": 600000,
+    "married": 1200000
+   }
+  },
+  "MT": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 4750000,
+      "rate": 0.047
+     },
+     {
+      "upTo": null,
+      "rate": 0.0565
+     }
+    ],
+    "married": [
+     {
+      "upTo": 9500000,
+      "rate": 0.047
+     },
+     {
+      "upTo": null,
+      "rate": 0.0565
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
+  },
+  "NC": {
+   "flatRate": 0.0399,
+   "standardDeduction": {
+    "single": 1275000,
+    "married": 2550000
+   }
+  },
+  "ND": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 4847500,
+      "rate": 0.0
+     },
+     {
+      "upTo": 24482500,
+      "rate": 0.0195
+     },
+     {
+      "upTo": null,
+      "rate": 0.025
+     }
+    ],
+    "married": [
+     {
+      "upTo": 8097500,
+      "rate": 0.0
+     },
+     {
+      "upTo": 29807500,
+      "rate": 0.0195
+     },
+     {
+      "upTo": null,
+      "rate": 0.025
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
+  },
+  "NE": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 413000,
+      "rate": 0.0246
+     },
+     {
+      "upTo": 2476000,
+      "rate": 0.0351
+     },
+     {
+      "upTo": null,
+      "rate": 0.0455
+     }
+    ],
+    "married": [
+     {
+      "upTo": 825000,
+      "rate": 0.0246
+     },
+     {
+      "upTo": 4953000,
+      "rate": 0.0351
+     },
+     {
+      "upTo": null,
+      "rate": 0.0455
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 885000,
+    "married": 1770000
+   }
   },
   "NH": {
    "brackets": []
   },
-  "CO": {
-   "flatRate": 0.044,
-   "standardDeduction": 1575000
+  "NJ": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 2000000,
+      "rate": 0.014
+     },
+     {
+      "upTo": 3500000,
+      "rate": 0.0175
+     },
+     {
+      "upTo": 4000000,
+      "rate": 0.035
+     },
+     {
+      "upTo": 7500000,
+      "rate": 0.0553
+     },
+     {
+      "upTo": 50000000,
+      "rate": 0.0637
+     },
+     {
+      "upTo": 100000000,
+      "rate": 0.0897
+     },
+     {
+      "upTo": null,
+      "rate": 0.1075
+     }
+    ],
+    "married": [
+     {
+      "upTo": 2000000,
+      "rate": 0.014
+     },
+     {
+      "upTo": 5000000,
+      "rate": 0.0175
+     },
+     {
+      "upTo": 7000000,
+      "rate": 0.0245
+     },
+     {
+      "upTo": 8000000,
+      "rate": 0.035
+     },
+     {
+      "upTo": 15000000,
+      "rate": 0.0553
+     },
+     {
+      "upTo": 50000000,
+      "rate": 0.0637
+     },
+     {
+      "upTo": 100000000,
+      "rate": 0.0897
+     },
+     {
+      "upTo": null,
+      "rate": 0.1075
+     }
+    ]
+   },
+   "personalExemption": {
+    "single": 100000,
+    "married": 200000
+   }
+  },
+  "NM": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 550000,
+      "rate": 0.015
+     },
+     {
+      "upTo": 1650000,
+      "rate": 0.032
+     },
+     {
+      "upTo": 3350000,
+      "rate": 0.043
+     },
+     {
+      "upTo": 6650000,
+      "rate": 0.047
+     },
+     {
+      "upTo": 21000000,
+      "rate": 0.049
+     },
+     {
+      "upTo": null,
+      "rate": 0.059
+     }
+    ],
+    "married": [
+     {
+      "upTo": 800000,
+      "rate": 0.015
+     },
+     {
+      "upTo": 2500000,
+      "rate": 0.032
+     },
+     {
+      "upTo": 5000000,
+      "rate": 0.043
+     },
+     {
+      "upTo": 10000000,
+      "rate": 0.047
+     },
+     {
+      "upTo": 31500000,
+      "rate": 0.049
+     },
+     {
+      "upTo": null,
+      "rate": 0.059
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 1610000,
+    "married": 3220000
+   }
+  },
+  "NV": {
+   "brackets": []
+  },
+  "NY": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 850000,
+      "rate": 0.039
+     },
+     {
+      "upTo": 1170000,
+      "rate": 0.044
+     },
+     {
+      "upTo": 1390000,
+      "rate": 0.0515
+     },
+     {
+      "upTo": 8065000,
+      "rate": 0.054
+     },
+     {
+      "upTo": 21540000,
+      "rate": 0.059
+     },
+     {
+      "upTo": 107755000,
+      "rate": 0.0685
+     },
+     {
+      "upTo": 500000000,
+      "rate": 0.0965
+     },
+     {
+      "upTo": 2500000000,
+      "rate": 0.103
+     },
+     {
+      "upTo": null,
+      "rate": 0.109
+     }
+    ],
+    "married": [
+     {
+      "upTo": 1715000,
+      "rate": 0.039
+     },
+     {
+      "upTo": 2360000,
+      "rate": 0.044
+     },
+     {
+      "upTo": 2790000,
+      "rate": 0.0515
+     },
+     {
+      "upTo": 16155000,
+      "rate": 0.054
+     },
+     {
+      "upTo": 32320000,
+      "rate": 0.059
+     },
+     {
+      "upTo": 215535000,
+      "rate": 0.0685
+     },
+     {
+      "upTo": 500000000,
+      "rate": 0.0965
+     },
+     {
+      "upTo": 2500000000,
+      "rate": 0.103
+     },
+     {
+      "upTo": null,
+      "rate": 0.109
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 800000,
+    "married": 1605000
+   }
+  },
+  "OH": {
+   "brackets": [
+    {
+     "upTo": 2605000,
+     "rate": 0.0
+    },
+    {
+     "upTo": null,
+     "rate": 0.0275
+    }
+   ],
+   "personalExemption": {
+    "single": 240000,
+    "married": 480000
+   }
+  },
+  "OK": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 375000,
+      "rate": 0.0
+     },
+     {
+      "upTo": 490000,
+      "rate": 0.025
+     },
+     {
+      "upTo": 720000,
+      "rate": 0.035
+     },
+     {
+      "upTo": null,
+      "rate": 0.045
+     }
+    ],
+    "married": [
+     {
+      "upTo": 750000,
+      "rate": 0.0
+     },
+     {
+      "upTo": 980000,
+      "rate": 0.025
+     },
+     {
+      "upTo": 1440000,
+      "rate": 0.035
+     },
+     {
+      "upTo": null,
+      "rate": 0.045
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 635000,
+    "married": 1270000
+   },
+   "personalExemption": {
+    "single": 100000,
+    "married": 200000
+   }
+  },
+  "OR": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 455000,
+      "rate": 0.0475
+     },
+     {
+      "upTo": 1140000,
+      "rate": 0.0675
+     },
+     {
+      "upTo": 12500000,
+      "rate": 0.0875
+     },
+     {
+      "upTo": null,
+      "rate": 0.099
+     }
+    ],
+    "married": [
+     {
+      "upTo": 910000,
+      "rate": 0.0475
+     },
+     {
+      "upTo": 2280000,
+      "rate": 0.0675
+     },
+     {
+      "upTo": 25000000,
+      "rate": 0.0875
+     },
+     {
+      "upTo": null,
+      "rate": 0.099
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 291000,
+    "married": 582000
+   }
   },
   "PA": {
    "flatRate": 0.0307,
    "conformsToPreTaxDeferrals": false
   },
-  "CA": {
+  "RI": {
    "brackets": [
     {
-     "upTo": 1075600,
-     "rate": 0.01
+     "upTo": 8205000,
+     "rate": 0.0375
     },
     {
-     "upTo": 2549900,
-     "rate": 0.02
-    },
-    {
-     "upTo": 4024500,
-     "rate": 0.04
-    },
-    {
-     "upTo": 5586600,
-     "rate": 0.06
-    },
-    {
-     "upTo": 7060600,
-     "rate": 0.08
-    },
-    {
-     "upTo": 36065900,
-     "rate": 0.093
-    },
-    {
-     "upTo": 43278700,
-     "rate": 0.103
-    },
-    {
-     "upTo": 72131400,
-     "rate": 0.113
+     "upTo": 18645000,
+     "rate": 0.0475
     },
     {
      "upTo": null,
-     "rate": 0.123
+     "rate": 0.0599
     }
    ],
-   "standardDeduction": 554000
+   "standardDeduction": {
+    "single": 1120000,
+    "married": 2240000
+   },
+   "personalExemption": {
+    "single": 525000,
+    "married": 1050000
+   }
+  },
+  "SC": {
+   "brackets": [
+    {
+     "upTo": 364000,
+     "rate": 0.0
+    },
+    {
+     "upTo": 1823000,
+     "rate": 0.03
+    },
+    {
+     "upTo": null,
+     "rate": 0.06
+    }
+   ],
+   "standardDeduction": {
+    "single": 835000,
+    "married": 1670000
+   }
+  },
+  "SD": {
+   "brackets": []
+  },
+  "TN": {
+   "brackets": []
+  },
+  "TX": {
+   "brackets": []
+  },
+  "UT": {
+   "flatRate": 0.045
+  },
+  "VA": {
+   "brackets": [
+    {
+     "upTo": 300000,
+     "rate": 0.02
+    },
+    {
+     "upTo": 500000,
+     "rate": 0.03
+    },
+    {
+     "upTo": 1700000,
+     "rate": 0.05
+    },
+    {
+     "upTo": null,
+     "rate": 0.0575
+    }
+   ],
+   "standardDeduction": {
+    "single": 875000,
+    "married": 1750000
+   },
+   "personalExemption": {
+    "single": 93000,
+    "married": 186000
+   }
+  },
+  "VT": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 4940000,
+      "rate": 0.0335
+     },
+     {
+      "upTo": 11970000,
+      "rate": 0.066
+     },
+     {
+      "upTo": 24970000,
+      "rate": 0.076
+     },
+     {
+      "upTo": null,
+      "rate": 0.0875
+     }
+    ],
+    "married": [
+     {
+      "upTo": 8250000,
+      "rate": 0.0335
+     },
+     {
+      "upTo": 19945000,
+      "rate": 0.066
+     },
+     {
+      "upTo": 30400000,
+      "rate": 0.076
+     },
+     {
+      "upTo": null,
+      "rate": 0.0875
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 765000,
+    "married": 1530000
+   },
+   "personalExemption": {
+    "single": 530000,
+    "married": 1060000
+   }
+  },
+  "WA": {
+   "brackets": []
+  },
+  "WI": {
+   "brackets": {
+    "single": [
+     {
+      "upTo": 1511000,
+      "rate": 0.035
+     },
+     {
+      "upTo": 5195000,
+      "rate": 0.044
+     },
+     {
+      "upTo": 33272000,
+      "rate": 0.053
+     },
+     {
+      "upTo": null,
+      "rate": 0.0765
+     }
+    ],
+    "married": [
+     {
+      "upTo": 2015000,
+      "rate": 0.035
+     },
+     {
+      "upTo": 6926000,
+      "rate": 0.044
+     },
+     {
+      "upTo": 44363000,
+      "rate": 0.053
+     },
+     {
+      "upTo": null,
+      "rate": 0.0765
+     }
+    ]
+   },
+   "standardDeduction": {
+    "single": 1396000,
+    "married": 2584000
+   },
+   "personalExemption": {
+    "single": 70000,
+    "married": 140000
+   }
+  },
+  "WV": {
+   "brackets": [
+    {
+     "upTo": 1000000,
+     "rate": 0.0222
+    },
+    {
+     "upTo": 2500000,
+     "rate": 0.0296
+    },
+    {
+     "upTo": 4000000,
+     "rate": 0.0333
+    },
+    {
+     "upTo": 6000000,
+     "rate": 0.0444
+    },
+    {
+     "upTo": null,
+     "rate": 0.0482
+    }
+   ],
+   "personalExemption": {
+    "single": 200000,
+    "married": 400000
+   }
+  },
+  "WY": {
+   "brackets": []
   }
  },
  "localRules": {}
