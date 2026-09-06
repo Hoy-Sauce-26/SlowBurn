@@ -1,0 +1,15 @@
+name: burn_engine
+description: >-
+  The Slow Burn projection engine. Pure Dart, no Flutter: everything in
+  docs/domain.md that turns a household into numbers, testable as arithmetic.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
