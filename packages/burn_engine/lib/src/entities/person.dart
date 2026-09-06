@@ -70,6 +70,26 @@ class Person {
     return tier;
   }
 
+  /// Whether this person can reach tax-deferred money without the 10% penalty
+  /// in [year] (§3.1).
+  ///
+  /// **Rounded conservatively**: eligible only if `birthDate + 59 years
+  /// 6 months` falls on or before January 1 of that year. At annual
+  /// granularity the alternative grants a full year of penalty-free access to
+  /// someone who turns 59½ in December, and erring toward the penalty is the
+  /// safe direction for a test that gates a retirement date.
+  ///
+  /// So it is not simply "age 60": a July birthday reaches it a year later
+  /// than a January one.
+  bool isPenaltyFreeIn(int year) {
+    final threshold = DateTime(
+      birthDate.year + 59,
+      birthDate.month + 6,
+      birthDate.day,
+    );
+    return !threshold.isAfter(DateTime(year, 1, 1));
+  }
+
   /// Their retirement year where they fixed one, otherwise null so the caller
   /// falls back to the household's solved year (§3.1).
   int? get plannedRetirementYear =>

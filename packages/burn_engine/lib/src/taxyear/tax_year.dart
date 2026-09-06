@@ -310,6 +310,22 @@ class TaxYear {
   Rate get seOasdiRate => oasdiRate * 2;
   Rate get seMedicareRate => medicareRate * 2;
 
+  /// The RMD age for someone born in [birthYear], saturating at the table's
+  /// published ends rather than running off either of them (§3.12).
+  ///
+  /// A birth year below the first row is an earlier cohort whose age statute
+  /// has already settled; one above the last is a later cohort statute has not
+  /// legislated yet, and the newest published rule is the best guess for both.
+  int? rmdAgeFor(int birthYear) {
+    if (rmdAgeByBirthYear.containsKey(birthYear)) {
+      return rmdAgeByBirthYear[birthYear];
+    }
+    final years = rmdAgeByBirthYear.keys.toList()..sort();
+    if (years.isEmpty) return null;
+    if (birthYear < years.first) return rmdAgeByBirthYear[years.first];
+    return rmdAgeByBirthYear[years.last];
+  }
+
   /// The RMD divisor for [age], saturating at the table's last published row
   /// rather than running off the end (§3.12).
   double rmdDivisorFor(int age) {
