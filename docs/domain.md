@@ -1949,7 +1949,7 @@ withdrawal treatment.
 **Proration applies to the annual cash-flow pipeline's results (§4), never to its inputs.** The
 pipeline always runs on full annual figures, and `frac` scales what comes out. Running it on
 prorated inputs would tax a partial year as though it were a whole one: five months of
-a $200,000 salary is$83,000, and $83,000 through progressive brackets yields a far lower effective
+a $200,000 salary is $83,000, and $83,000 through progressive brackets yields a far lower effective
 rate than the household actually pays. The Social Security wage base breaks the same way, since a
 projection run in August must not hand a high earner a fresh, unconsumed wage base for the remaining
 months.
@@ -2428,6 +2428,8 @@ Each of these falls out of the same engine, with no variant-specific entities.
 
 ### 9.1 Lean / Fat FIRE
 
+*Early retirement on a deliberately small budget, or on a large one.*
+
 The same plan at a different standard of living, and it needs no new field.
 `ExpenseItem.phase` and `postRetirementAmount` (§3.7) already carry spending line by line
 across the retirement boundary. Fat FIRE is a `preRetirementOnly` car, a
@@ -2435,11 +2437,12 @@ across the retirement boundary. Fat FIRE is a `preRetirementOnly` car, a
 its working figure. Lean is the same instrument the other way.
 
 Keeping lean and fat side by side means two cloned `Household`s (§3.10), compared through
-§10.2. A single factor scaling all retirement spending was considered and rejected: it
-models a lifestyle nobody lives, since the point of the exercise is that housing may not
-move at all while travel quintuples.
+§10.2.
 
 ### 9.2 Barista FIRE
+
+*Retiring early into part-time work, often kept for its health coverage, with savings already
+funding the rest.*
 
 An `IncomeStream` starting at that Person's own retirement, with an explicit `endYear`, since
 the earned kinds otherwise default to ending the year before it (§3.3). The single loop (§6)
@@ -2458,6 +2461,12 @@ real program would withhold part of it against those earnings, and raises
 **`earningsTestNotModeled`** for that year (§3.11).
 
 ### 9.3 Coast FIRE
+
+*Saving only until the balance will reach the target on its own, then working on to cover
+current costs while it compounds untouched.*
+
+Coast FIRE sits before the retirement year and Barista after it. A coaster still covers
+their whole cost of living from work; a barista's savings are already paying part of it.
 
 Set `Contribution.endYear` on every account, **and omit the saving steps from that
 scenario's `contributionWaterfall`** (§4.4.4), leaving `highInterestDebt`,
@@ -2507,6 +2516,8 @@ cash flow, which is why this is the one place the model reports sub-annual preci
 makes "you can stop contributing in March 2031" legible where "2031" is not.
 
 ### 9.4 Traditional retirement
+
+*Stopping at the conventional age, with no early years to bridge.*
 
 `plannedRetirementAge` set to a traditional age, and nothing else. §6.1 takes that person
 out of the retirement-year solve entirely, the bridge period (§8.3) is empty, and no
