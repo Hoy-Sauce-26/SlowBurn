@@ -59,11 +59,14 @@ bool isRestrictedPurpose(TaxTreatment treatment) =>
     treatment == TaxTreatment.educationTaxFree;
 
 /// Whether a stream pays FICA, before any per-stream override (§3.3).
+///
+/// False for `selfEmployment`, which §4.2 handles on its own terms: SE income
+/// pays both halves through `seTax` and shares the OASDI cap with wages. A
+/// stream counted in both places would be taxed twice.
 bool defaultIsFicaSubject(IncomeKind kind) =>
     kind == IncomeKind.w2Wages ||
     kind == IncomeKind.bonus ||
-    kind == IncomeKind.rsuVesting ||
-    kind == IncomeKind.selfEmployment;
+    kind == IncomeKind.rsuVesting;
 
 /// Whether a stream feeds the §199A deduction, before any override (§3.3).
 bool defaultIsQualifiedBusinessIncome(IncomeKind kind) =>

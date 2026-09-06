@@ -19,6 +19,8 @@ export 'src/entities/person.dart';
 export 'src/entities/property.dart';
 export 'src/entities/snapshot.dart';
 export 'src/entities/spanned.dart';
+export 'src/pipeline/brackets.dart';
+export 'src/pipeline/wages.dart';
 export 'src/taxyear/tax_year.dart';
 export 'src/taxyear/tax_year_loader.dart';
 export 'src/validate/finding.dart';
