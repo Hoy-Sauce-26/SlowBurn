@@ -7,13 +7,13 @@
 /// in [additionalMedicare] below.
 library;
 
-import '../entities/account.dart';
 import '../entities/household.dart';
 import '../entities/income.dart';
 import '../entities/person.dart';
 import '../enums.dart';
 import '../taxyear/tax_year.dart';
 import '../types.dart';
+import 'income_tax.dart';
 
 /// One person's wages and payroll tax for one projected year.
 class PersonWages {
@@ -101,7 +101,7 @@ PersonWages computeWages(
   final exemptContributions = sumMoney(
     household.accountsFor(person.id).where((a) => a.contribution.reducesFicaWages).map(
           (a) => resolvedContributions[a.id] ??
-              _committedAmount(a, household, year, currentYear),
+              resolveCommittedContribution(a, household, year, currentYear),
         ),
   );
   final exemptDeductions = sumMoney(
@@ -143,27 +143,6 @@ PersonWages computeWages(
     seMedicare: seMedicare,
     seDeduction: (seOasdi + seMedicare) / 2,
   );
-}
-
-/// What an account's committed contribution asks for, before any cap (§3.4.1).
-Money _committedAmount(
-  Account account,
-  Household household,
-  int year,
-  int currentYear,
-) {
-  final c = account.contribution;
-  if (c.mode == ContributionMode.fixedAmount) {
-    return c.uncappedAmount(year, base: Money.zero);
-  }
-  final base = sumMoney(
-    c.contributionBaseStreamIds
-        .map((id) =>
-            household.incomeStreams.where((s) => s.id == id).firstOrNull)
-        .whereType<IncomeStream>()
-        .map((s) => s.resolvedAmount(year, currentYear: currentYear)),
-  );
-  return c.uncappedAmount(year, base: base);
 }
 
 /// §4.2's Additional Medicare Tax, per **TaxUnit**: the threshold is a

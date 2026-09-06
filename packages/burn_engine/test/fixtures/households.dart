@@ -116,3 +116,49 @@ Household simpleHousehold() => Household(
       incomeStreams: [salary()],
       accounts: [traditional401k(), brokerage()],
     );
+
+/// A minimal asset-class set: one equity class throwing off a dividend, one
+/// cash class throwing off interest that does not qualify.
+Map<Id, AssetClass> assetClasses() => {
+      'stocks': const AssetClass(
+        id: 'stocks',
+        label: AssetClassLabel.usStocks,
+        expectedRealReturn: 0.05,
+        pessimisticRealReturn: 0.02,
+        optimisticRealReturn: 0.08,
+        incomeYield: 0.013,
+        qualifiedIncomeFraction: 1.0,
+      ),
+      'cash': const AssetClass(
+        id: 'cash',
+        label: AssetClassLabel.cash,
+        expectedRealReturn: 0.0,
+        pessimisticRealReturn: -0.01,
+        optimisticRealReturn: 0.01,
+        incomeYield: 0.01,
+        qualifiedIncomeFraction: 0.0,
+      ),
+    };
+
+Account brokerageIn({
+  String id = 'acct-taxable',
+  num balance = 100000,
+  num basis = 60000,
+  String assetClassId = 'stocks',
+}) =>
+    Account(
+      id: id,
+      personId: 'p1',
+      label: 'Brokerage',
+      kind: AccountKind.taxableBrokerage,
+      taxTreatment: TaxTreatment.taxable,
+      limitFamily: LimitFamily.none,
+      balance: Money.dollars(balance),
+      costBasis: Money.dollars(basis),
+      isRestrictedPurpose: false,
+      assetAllocationId: assetClassId,
+      contribution: const Contribution(
+        mode: ContributionMode.fixedAmount,
+        value: 0,
+      ),
+    );
