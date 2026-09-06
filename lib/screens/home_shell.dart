@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/persistence.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/results_panel.dart';
 import 'accounts_screen.dart';
@@ -21,8 +22,35 @@ class HomeShell extends ConsumerStatefulWidget {
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell>
+    with WidgetsBindingObserver {
   int _selected = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Reads what was there last time, then keeps writing it back. There is
+    // nowhere else the plan exists (§1.4), so an unsaved edit is a lost one.
+    ref.read(persistenceProvider).start();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Closing the window or switching away should not lose the last few
+    // seconds of typing, so the debounce is skipped here.
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      ref.read(persistenceProvider).save();
+    }
+  }
 
   /// The order a household is entered in, which is also the order the guided
   /// flow will walk (§9's variants become presets over this same list).

@@ -53,7 +53,7 @@ class EntityList extends StatelessWidget {
         ),
         ?banner,
         Expanded(
-          child: children.isEmpty
+          child: children.isEmpty && emptyMessage.isNotEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
@@ -76,7 +76,7 @@ class EntityList extends StatelessWidget {
                   ],
                 ),
         ),
-        if (onAdd != null)
+        if (onAdd != null && addLabel.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
             child: Align(
@@ -88,6 +88,79 @@ class EntityList extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// A heading and its own add button, for a screen holding more than one kind
+/// of thing.
+///
+/// The add button sits with the section rather than at the foot of the page:
+/// one button under a list of employers reads as "add an employer", and the
+/// same button after three lists reads as nothing in particular.
+class EntitySection extends StatelessWidget {
+  final String title;
+  final String? blurb;
+  final String addLabel;
+  final VoidCallback? onAdd;
+  final List<Widget> children;
+
+  /// Shown in place of the list when this section is empty.
+  final String? emptyMessage;
+
+  const EntitySection({
+    super.key,
+    required this.title,
+    required this.addLabel,
+    required this.children,
+    this.onAdd,
+    this.blurb,
+    this.emptyMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Text(title, style: theme.textTheme.titleSmall),
+        if (blurb != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              blurb!,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        const SizedBox(height: 8),
+        if (children.isEmpty && emptyMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              emptyMessage!,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.outline),
+            ),
+          ),
+        for (final child in children)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: child,
+          ),
+        if (onAdd != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(addLabel),
+            ),
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }

@@ -42,8 +42,18 @@ class HouseholdNotifier extends Notifier<Household> {
 
   void savePerson(Person p) =>
       state = state.copyWith(people: _upsert(state.people, p, (e) => e.id));
-  void removePerson(Id id) =>
-      state = state.copyWith(people: _without(state.people, id, (e) => e.id));
+  /// Removing the last person filing a return removes the return with them.
+  /// A tax unit nobody files is not a state anyone means to be in, and it would
+  /// otherwise sit on the screen as a form for a household with no one in it.
+  void removePerson(Id id) {
+    final people = _without(state.people, id, (e) => e.id);
+    state = state.copyWith(
+      people: people,
+      taxUnits: state.taxUnits
+          .where((u) => people.any((p) => p.taxUnitId == u.id))
+          .toList(),
+    );
+  }
 
   void saveTaxUnit(TaxUnit t) => state =
       state.copyWith(taxUnits: _upsert(state.taxUnits, t, (e) => e.id));

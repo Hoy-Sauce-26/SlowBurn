@@ -69,7 +69,8 @@ void main() {
       await pumpApp(tester);
       await tapRail(tester, 'Income');
       expect(find.text('Add income'), findsNothing);
-      expect(find.textContaining('Add a person first'), findsOneWidget,
+      expect(find.textContaining('Add a person on the Household screen'),
+          findsOneWidget,
           reason: 'the wage base and every limit are per individual');
     });
   });

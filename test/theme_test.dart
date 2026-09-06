@@ -22,10 +22,9 @@ double contrast(Color a, Color b) {
 }
 
 void main() {
-  group('the palette FF7467 generates', () {
-    // The implementation plan flagged this: FF7467 is a coral where Roamfree's
-    // FFC067 is an amber, and a darker seed. Worth checking before seven
-    // screens are built on it rather than after.
+  group('the palette the seed generates', () {
+    // Checked whenever the seed moves. A palette is generated, so a new seed
+    // is a new set of contrast pairs and not just a new hue.
     for (final (name, theme) in [
       ('light', lightTheme()),
       ('dark', darkTheme()),
@@ -63,13 +62,30 @@ void main() {
     }
 
     test('one seed drives both brightnesses', () {
-      expect(seedColor, const Color(0xFFFF7467));
+      expect(seedColor, const Color(0xFF67A6FF));
       expect(lightTheme().colorScheme.brightness, Brightness.light);
       expect(darkTheme().colorScheme.brightness, Brightness.dark);
     });
 
     test('a card adds no margin of its own, as in Roamfree', () {
       expect(lightTheme().cardTheme.margin, EdgeInsets.zero);
+    });
+  });
+
+  group('selection does not read as a warning', () {
+    test('the primary sits far from the error colour', () {
+      // A coral seed put filled buttons, selected chips and focused fields
+      // close enough to the error red that every selection looked like a
+      // problem. Distance in hue is what stops that.
+      for (final theme in [lightTheme(), darkTheme()]) {
+        final s = theme.colorScheme;
+        final primaryHue = HSLColor.fromColor(s.primary).hue;
+        final errorHue = HSLColor.fromColor(s.error).hue;
+        final gap = (primaryHue - errorHue).abs();
+        final separation = gap > 180 ? 360 - gap : gap;
+        expect(separation, greaterThan(60),
+            reason: 'primary and error should not be mistaken for each other');
+      }
     });
   });
 }

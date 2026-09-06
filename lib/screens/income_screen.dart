@@ -24,67 +24,89 @@ class IncomeScreen extends ConsumerWidget {
 
     return EntityList(
       title: 'Income',
-      blurb: 'Salary, self-employment, rentals and pensions.',
-      addLabel: 'Add income',
-      emptyMessage: canAdd
-          ? 'Add what the household earns.\nEarned income stops at retirement; '
-              'a pension or rental does not.'
-          : 'Add a person first: income belongs to someone, since the wage base '
-              'and every contribution limit are per individual.',
+      blurb: 'What the household earns, what it pays for out of payroll, and '
+          'who it works for.',
+      addLabel: '',
+      emptyMessage: '',
       banner: const FlagBanner(home: FlagHome.income),
-      onAdd: canAdd ? () => _edit(context, ref, null) : null,
       children: [
-        for (final employer in household.employers)
-          EntityTile(
-            icon: Icons.business_outlined,
-            title: employer.label,
-            subtitle: _employerSummary(employer, household),
-            onTap: () => _editEmployer(context, ref, employer),
-            onDelete: () => notifier.removeEmployer(employer.id),
-          ),
-        if (household.employers.isNotEmpty) const SizedBox(height: 4),
-        for (final stream in household.incomeStreams)
-          EntityTile(
-            icon: stream.kind.isEarned
-                ? Icons.work_outline
-                : Icons.account_balance_outlined,
-            title: stream.label,
-            subtitle: _describe(stream, household),
-            trailing: formatMoneyCompact(stream.grossAnnualAmount),
-            onTap: () => _edit(context, ref, stream),
-            onDelete: () => notifier.removeIncomeStream(stream.id),
-          ),
-        for (final deduction in household.payrollDeductions)
-          EntityTile(
-            icon: Icons.medical_services_outlined,
-            title: deduction.label,
-            subtitle: '${humanise(deduction.kind.name)} · '
-                '${deduction.reducesFicaWages ? 'reduces FICA wages' : 'income tax only'}',
-            trailing: formatMoneyCompact(deduction.annualAmount),
-            onTap: () => _editDeduction(context, ref, deduction),
-            onDelete: () => notifier.removePayrollDeduction(deduction.id),
-          ),
-        if (canAdd)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () => _editEmployer(context, ref, null),
-                  icon: const Icon(Icons.business_outlined),
-                  label: const Text('Add an employer'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _editDeduction(context, ref, null),
-                  icon: const Icon(Icons.medical_services_outlined),
-                  label: const Text('Add a payroll deduction'),
-                ),
-              ],
-            ),
-          ),
+        EntitySection(
+          title: 'Employers',
+          blurb: 'Naming an employer lets us tie a job to the retirement plan '
+              'it sponsors, which is how an employer match is worked out.',
+          addLabel: 'Add an employer',
+          onAdd: canAdd ? () => _editEmployer(context, ref, null) : null,
+          emptyMessage: canAdd
+              ? 'Optional. Add one if your job comes with a 401(k) match.'
+              : null,
+          children: [
+            for (final employer in household.employers)
+              EntityTile(
+                icon: Icons.business_outlined,
+                title: employer.label,
+                subtitle: _employerSummary(employer, household),
+                onTap: () => _editEmployer(context, ref, employer),
+                onDelete: () => notifier.removeEmployer(employer.id),
+              ),
+          ],
+        ),
+        EntitySection(
+          title: 'Income',
+          addLabel: 'Add income',
+          onAdd: canAdd ? () => _edit(context, ref, null) : null,
+          emptyMessage: canAdd
+              ? 'Nothing yet. Earned income stops at retirement; a pension or '
+                  'a rental does not.'
+              : 'Add a person on the Household screen first. Income belongs to '
+                  'someone, since the Social Security wage base and every '
+                  'contribution limit are worked out per person.',
+          children: [
+            for (final stream in household.incomeStreams)
+              EntityTile(
+                icon: stream.kind.isEarned
+                    ? Icons.work_outline
+                    : Icons.account_balance_outlined,
+                title: stream.label,
+                subtitle: _describe(stream, household),
+                trailing: formatMoneyCompact(stream.grossAnnualAmount),
+                onTap: () => _edit(context, ref, stream),
+                onDelete: () => notifier.removeIncomeStream(stream.id),
+              ),
+          ],
+        ),
+        EntitySection(
+          title: 'Taken from your pay',
+          blurb: 'Money that never reaches your bank account: health premiums, '
+              'an FSA, a commuter benefit.',
+          addLabel: 'Add a payroll deduction',
+          onAdd: canAdd ? () => _editDeduction(context, ref, null) : null,
+          emptyMessage: canAdd ? 'Nothing yet.' : null,
+          children: [
+            for (final deduction in household.payrollDeductions)
+              EntityTile(
+                icon: Icons.medical_services_outlined,
+                title: deduction.label,
+                subtitle: _describeDeduction(deduction, household),
+                trailing: formatMoneyCompact(deduction.annualAmount),
+                onTap: () => _editDeduction(context, ref, deduction),
+                onDelete: () => notifier.removePayrollDeduction(deduction.id),
+              ),
+          ],
+        ),
       ],
     );
+  }
+
+  /// A deduction reads differently for each person who has one, so two FSAs in
+  /// a household of two are told apart at a glance.
+  static String _describeDeduction(PayrollDeduction d, Household h) {
+    final owner = h.personById(d.personId)?.displayName;
+    final parts = <String>[
+      if (owner != null && h.people.length > 1) owner,
+      humanise(d.kind.name),
+      if (d.reducesFicaWages) 'before tax and Social Security' else 'before tax',
+    ];
+    return parts.join(' · ');
   }
 
   /// An `Employer` holds no figures of its own. It exists so a stream and an
@@ -93,7 +115,15 @@ class IncomeScreen extends ConsumerWidget {
   static String _employerSummary(Employer e, Household h) {
     final streams = h.incomeStreams.where((s) => s.employerId == e.id).length;
     final accounts = h.accounts.where((a) => a.employerId == e.id).length;
-    return '$streams income · $accounts account${accounts == 1 ? '' : 's'}';
+    if (streams == 0 && accounts == 0) {
+      return 'Not linked to anything yet. Pick it on a job above, and on the '
+          'plan it sponsors under Accounts.';
+    }
+    final parts = <String>[
+      if (streams > 0) '$streams job${streams == 1 ? '' : 's'}',
+      if (accounts > 0) '$accounts account${accounts == 1 ? '' : 's'}',
+    ];
+    return 'Linked to ${parts.join(' and ')}';
   }
 
   Future<void> _editEmployer(
@@ -107,13 +137,6 @@ class IncomeScreen extends ConsumerWidget {
       title: existing == null ? 'Add an employer' : existing.label,
       build: (context) => Column(
         children: [
-          Text(
-            'An employer is just a name two things can point at. Linking a '
-            'job and the plan it sponsors is what lets the engine see the pay '
-            'behind an employer match and the §415(c) ceiling.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
           LabelledTextField(
             label: 'Name',
             initial: label,
@@ -158,19 +181,15 @@ class IncomeScreen extends ConsumerWidget {
       build: (context) => StatefulBuilder(
         builder: (context, setState) => Column(
           children: [
-            Text(
-              'Money that never reaches the paycheck: a health premium, an '
-              'FSA election, a commuter benefit. Cafeteria-plan items under '
-              '§125 also reduce FICA wages, which a 401(k) deferral does not.',
-              style: Theme.of(context).textTheme.bodySmall,
+            _Note(
+              'This is for money that is spent, not saved: a health premium, '
+              'an FSA, a transit pass. It comes out before tax, and whatever '
+              'is left at the end of the year is gone.\n\n'
+              'A 401(k) or HSA contribution also comes out of your pay, but it '
+              'is still your money and it grows. Add those under Accounts so '
+              'they count toward what you are worth.',
             ),
             const SizedBox(height: 16),
-            LabelledTextField(
-              label: 'Label',
-              initial: label,
-              onChanged: (v) => label = v,
-            ),
-            const SizedBox(height: 12),
             FieldRow([
               EnumField<PayrollDeductionKind>(
                 label: 'Kind',
@@ -179,7 +198,9 @@ class IncomeScreen extends ConsumerWidget {
                 onChanged: (v) => setState(() => kind = v),
               ),
               MoneyField(
-                label: 'A year',
+                label: 'Cost per year',
+                helper: 'What comes out of your pay over a full year, in '
+                    "today's dollars.",
                 initial: amount,
                 onChanged: (v) => amount = v,
               ),
@@ -190,24 +211,35 @@ class IncomeScreen extends ConsumerWidget {
                 values: household.people,
                 value: household.personById(personId),
                 describe: (p) => p.displayName,
-                onChanged: (p) => personId = p.id,
+                onChanged: (p) => setState(() => personId = p.id),
               ),
             const SizedBox(height: 12),
             FieldRow([
               YearField(
                 label: 'Start year',
+                helper: 'Leave blank if it is already coming out of your pay.',
                 initial: startYear,
                 onChanged: (v) => startYear = v,
               ),
               YearField(
                 label: 'End year',
                 helper: kind.isCoverageRelated
-                    ? 'Blank ends it with employer coverage'
-                    : 'Blank ends it at retirement',
+                    ? 'Leave blank to end it when your health cover through '
+                        'work does.'
+                    : 'Leave blank to end it when you retire.',
                 initial: endYear,
                 onChanged: (v) => endYear = v,
               ),
             ]),
+            const SizedBox(height: 12),
+            LabelledTextField(
+              label: 'Name it (optional)',
+              initial: label,
+              onChanged: (v) => label = v,
+            ),
+            const SizedBox(height: 4),
+            _Note('Left blank, this will be called '
+                '"${_defaultDeductionLabel(household, personId, kind)}".'),
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
@@ -218,7 +250,9 @@ class IncomeScreen extends ConsumerWidget {
                   notifier.savePayrollDeduction(PayrollDeduction(
                     id: existing?.id ?? newId('pd'),
                     personId: personId,
-                    label: label.isEmpty ? humanise(kind.name) : label,
+                    label: label.trim().isEmpty
+                        ? _defaultDeductionLabel(household, personId, kind)
+                        : label.trim(),
                     kind: kind,
                     annualAmount: amount,
                     reducesFederalTaxableIncome: true,
@@ -263,8 +297,8 @@ class IncomeScreen extends ConsumerWidget {
     var endYear = existing?.endYear;
     var startMonth = existing?.startMonth;
     var endMonth = existing?.endMonth;
-    var variability = existing?.variability ?? IncomeVariability.guaranteed;
     var employerId = existing?.employerId;
+    final thisYear = DateTime.now().year;
 
     await showEditor<void>(
       context,
@@ -272,12 +306,6 @@ class IncomeScreen extends ConsumerWidget {
       build: (context) => StatefulBuilder(
         builder: (context, setState) => Column(
           children: [
-            LabelledTextField(
-              label: 'Label',
-              initial: label,
-              onChanged: (v) => label = v,
-            ),
-            const SizedBox(height: 12),
             FieldRow([
               EnumField<IncomeKind>(
                 label: 'Kind',
@@ -292,7 +320,7 @@ class IncomeScreen extends ConsumerWidget {
                   values: household.people,
                   value: household.personById(personId),
                   describe: (p) => p.displayName,
-                  onChanged: (p) => personId = p.id,
+                  onChanged: (p) => setState(() => personId = p.id),
                 ),
             ]),
             FieldRow([
@@ -310,52 +338,75 @@ class IncomeScreen extends ConsumerWidget {
               ),
             ]),
             FieldRow([
-              YearField(
-                label: 'Start year',
-                helper: 'Blank means already running',
-                initial: startYear,
-                onChanged: (v) => startYear = v,
+              NumberChoiceField(
+                label: 'Starts',
+                helper: 'Leave blank if you are already being paid this.',
+                first: thisYear,
+                last: thisYear + 60,
+                value: startYear,
+                noneLabel: 'Already running',
+                onChanged: (v) => setState(() {
+                  startYear = v;
+                  if (v == null) startMonth = null;
+                }),
               ),
-              YearField(
-                label: 'Start month',
-                helper: '1–12, blank means January',
-                initial: startMonth,
-                onChanged: (v) => startMonth = v,
-              ),
+              if (startYear != null)
+                NumberChoiceField(
+                  label: 'From which month',
+                  first: 1,
+                  last: 12,
+                  value: startMonth ?? 1,
+                  describe: (m) => monthNames[m - 1],
+                  onChanged: (v) => startMonth = v,
+                ),
             ]),
             FieldRow([
-              YearField(
-                label: 'End year',
-                helper: 'Blank ends it at retirement',
-                initial: endYear,
-                onChanged: (v) => endYear = v,
+              NumberChoiceField(
+                label: 'Ends',
+                helper: 'Leave blank to stop it when you retire.',
+                first: thisYear,
+                last: thisYear + 60,
+                value: endYear,
+                noneLabel: 'When I retire',
+                onChanged: (v) => setState(() {
+                  endYear = v;
+                  if (v == null) endMonth = null;
+                }),
               ),
-              YearField(
-                label: 'End month',
-                helper: 'Set both across a job change',
-                initial: endMonth,
-                onChanged: (v) => endMonth = v,
-              ),
+              if (endYear != null)
+                NumberChoiceField(
+                  label: 'Through which month',
+                  helper: 'Set this and the next job\'s start month so a '
+                      'year with two jobs is not counted twice.',
+                  first: 1,
+                  last: 12,
+                  value: endMonth ?? 12,
+                  describe: (m) => monthNames[m - 1],
+                  onChanged: (v) => endMonth = v,
+                ),
             ]),
             if (household.employers.isNotEmpty)
-              ChoiceField<Employer?>(
+              SearchableField<Employer>(
                 label: 'Employer',
-                helper: 'Links this pay to the plan it sponsors',
-                values: [null, ...household.employers],
+                helper: 'Who pays it. This is how a 401(k) and its match find '
+                    'the pay they come out of.',
+                values: household.employers,
                 value: household.employers
                     .where((e) => e.id == employerId)
                     .firstOrNull,
-                describe: (e) => e?.label ?? 'None',
-                onChanged: (e) => employerId = e?.id,
+                noneLabel: 'Nobody, I work for myself',
+                describe: (e) => e.label,
+                onChanged: (e) => setState(() => employerId = e?.id),
               ),
-            if (household.employers.isNotEmpty) const SizedBox(height: 12),
-            EnumField<IncomeVariability>(
-              label: 'Dependability',
-              helper: 'Display only: a plan resting on bonuses is worth seeing',
-              values: IncomeVariability.values,
-              value: variability,
-              onChanged: (v) => variability = v,
+            const SizedBox(height: 12),
+            LabelledTextField(
+              label: 'Name it (optional)',
+              initial: label,
+              onChanged: (v) => label = v,
             ),
+            const SizedBox(height: 4),
+            _Note('Left blank, this will be called '
+                '"${_defaultIncomeLabel(household, personId, employerId, kind)}".'),
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
@@ -365,7 +416,10 @@ class IncomeScreen extends ConsumerWidget {
                     id: existing?.id ?? newId('inc'),
                     personId: personId,
                     employerId: employerId,
-                    label: label.isEmpty ? humanise(kind.name) : label,
+                    label: label.trim().isEmpty
+                        ? _defaultIncomeLabel(
+                            household, personId, employerId, kind)
+                        : label.trim(),
                     kind: kind,
                     grossAnnualAmount: amount,
                     realGrowthRate: growth,
@@ -380,7 +434,14 @@ class IncomeScreen extends ConsumerWidget {
                             defaultIsQualifiedBusinessIncome(kind),
                     isSpecifiedServiceBusiness:
                         existing?.isSpecifiedServiceBusiness ?? false,
-                    variability: variability,
+                    // Bonuses and RSUs are not money you can count on, and the
+                    // kind already says which is which, so it is derived
+                    // rather than asked a second time.
+                    variability: existing?.variability ??
+                        (kind == IncomeKind.bonus ||
+                                kind == IncomeKind.rsuVesting
+                            ? IncomeVariability.variable
+                            : IncomeVariability.guaranteed),
                   ));
                   Navigator.of(context).pop();
                 },
@@ -392,4 +453,66 @@ class IncomeScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// "Masha's health FSA", so two FSAs in one household are told apart without
+/// anyone having to name them.
+String _defaultDeductionLabel(
+    Household h, Id personId, PayrollDeductionKind kind) {
+  final name = h.personById(personId)?.displayName;
+  final what = switch (kind) {
+    PayrollDeductionKind.healthPremium => 'health premium',
+    PayrollDeductionKind.dentalVisionPremium => 'dental and vision',
+    PayrollDeductionKind.healthFsa => 'health FSA',
+    PayrollDeductionKind.dependentCareFsa => 'dependent care FSA',
+    PayrollDeductionKind.commuterBenefit => 'commuter benefit',
+    PayrollDeductionKind.other => 'payroll deduction',
+  };
+  return name == null ? humanise(what) : "$name's $what";
+}
+
+/// A short aside, for the things a form label has no room to say.
+class _Note extends StatelessWidget {
+  final String text;
+  const _Note(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.info_outline,
+            size: 16, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "Alex at Acme", or "Alex's salary" where no employer is named. A label
+/// nobody has to think of is one fewer thing between a user and their number.
+String _defaultIncomeLabel(
+    Household h, Id personId, Id? employerId, IncomeKind kind) {
+  final name = h.personById(personId)?.displayName;
+  final employer =
+      h.employers.where((e) => e.id == employerId).firstOrNull?.label;
+  final what = switch (kind) {
+    IncomeKind.w2Wages => 'salary',
+    IncomeKind.selfEmployment => 'self-employment',
+    IncomeKind.bonus => 'bonus',
+    IncomeKind.rsuVesting => 'shares',
+    IncomeKind.rentalNet => 'rental income',
+    IncomeKind.pension => 'pension',
+    IncomeKind.other => 'income',
+  };
+  if (employer != null) return '${name ?? 'Income'} at $employer';
+  return name == null ? humanise(what) : "$name's $what";
 }

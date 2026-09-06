@@ -152,6 +152,7 @@ class YearField extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           helperText: helper,
+          helperMaxLines: 3,
           border: const OutlineInputBorder(),
         ),
         keyboardType: TextInputType.number,
@@ -159,6 +160,227 @@ class YearField extends StatelessWidget {
         onChanged: (text) => onChanged(int.tryParse(text)),
       );
 }
+
+/// A dropdown you can type into on a desktop and only tap on a phone.
+///
+/// `DropdownMenu` filters as you type, so "199" jumps to 1990 and "New" to
+/// New York. [requestFocusOnTap] is what keeps that from being a nuisance on a
+/// touch device: false there means tapping opens the list without raising the
+/// keyboard, while a hardware keyboard still filters.
+class SearchableField<T> extends StatefulWidget {
+  final String label;
+  final String? helper;
+  final List<T> values;
+  final T? value;
+  final ValueChanged<T?> onChanged;
+  final String Function(T) describe;
+
+  /// The entry meaning "no answer", where one is allowed.
+  final String? noneLabel;
+
+  const SearchableField({
+    super.key,
+    required this.label,
+    required this.values,
+    required this.value,
+    required this.onChanged,
+    required this.describe,
+    this.helper,
+    this.noneLabel,
+  });
+
+  @override
+  State<SearchableField<T>> createState() => _SearchableFieldState<T>();
+}
+
+class _SearchableFieldState<T> extends State<SearchableField<T>> {
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.text = _shownFor(widget.value);
+    _focus.addListener(_settle);
+  }
+
+  @override
+  void didUpdateWidget(SearchableField<T> old) {
+    super.didUpdateWidget(old);
+    if (widget.value != old.value && !_focus.hasFocus) {
+      _controller.text = _shownFor(widget.value);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_settle);
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  /// Typing narrows the list, so a half-typed word is left in the box when
+  /// attention moves on. Put back whatever is actually chosen.
+  void _settle() {
+    if (_focus.hasFocus) {
+      // Arriving with an answer already in the box, the next letter typed
+      // should start a new search rather than land after "Colorado".
+      _controller.selection = TextSelection(
+          baseOffset: 0, extentOffset: _controller.text.length);
+      return;
+    }
+    final settled = _shownFor(widget.value);
+    if (_controller.text != settled) _controller.text = settled;
+  }
+
+  String _shownFor(T? value) =>
+      value == null ? widget.noneLabel ?? '' : widget.describe(value);
+
+  List<String> get _entryLabels => [
+        if (widget.noneLabel != null) widget.noneLabel!,
+        for (final v in widget.values) widget.describe(v),
+      ];
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <DropdownMenuEntry<T?>>[
+      if (widget.noneLabel != null)
+        DropdownMenuEntry<T?>(value: null, label: widget.noneLabel!),
+      for (final v in widget.values)
+        DropdownMenuEntry<T?>(value: v, label: widget.describe(v)),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) => DropdownMenu<T?>(
+        controller: _controller,
+        focusNode: _focus,
+        initialSelection: widget.value,
+        width: constraints.maxWidth,
+        label: Text(widget.label),
+        helperText: widget.helper,
+        enableFilter: true,
+        enableSearch: true,
+        requestFocusOnTap: _typingIsWelcome(context),
+        menuHeight: 360,
+        inputFormatters: [_KeepsToTheList(() => _entryLabels)],
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+          helperMaxLines: 3,
+        ),
+        dropdownMenuEntries: entries,
+        onSelected: (v) {
+          if (v == null && widget.noneLabel == null) return;
+          widget.onChanged(v);
+        },
+      ),
+    );
+  }
+
+  /// A physical keyboard is worth focusing for; a soft one covers the list you
+  /// are trying to read.
+  static bool _typingIsWelcome(BuildContext context) {
+    switch (Theme.of(context).platform) {
+      case TargetPlatform.iOS:
+      case TargetPlatform.android:
+        return false;
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+      case TargetPlatform.linux:
+      case TargetPlatform.fuchsia:
+        return true;
+    }
+  }
+}
+
+/// Refuses any keystroke that would leave the box reading something no entry
+/// matches. Typing "New" in a list of states narrows it to four; typing "Newq"
+/// does nothing at all, so the box can never end up holding an answer that is
+/// not on the list.
+class _KeepsToTheList extends TextInputFormatter {
+  _KeepsToTheList(this.labels);
+  final List<String> Function() labels;
+
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue before, TextEditingValue after) {
+    if (after.text.isEmpty) return after;
+    final typed = after.text.toLowerCase();
+    final matches = labels().any((l) => l.toLowerCase().contains(typed));
+    return matches ? after : before;
+  }
+}
+
+/// A dropdown over a range of numbers. A birth year is picked, not typed:
+/// there is a right answer, the range is known, and a typo in a year moves
+/// every age gate in the plan.
+class NumberChoiceField extends StatelessWidget {
+  final String label;
+  final String? helper;
+  final int first;
+  final int last;
+  final int? value;
+  final ValueChanged<int?> onChanged;
+  final String Function(int)? describe;
+  final bool descending;
+
+  /// The entry that means "no answer". Without one, a dropdown is a trap: a
+  /// value picked by accident can never be taken back.
+  final String? noneLabel;
+
+  const NumberChoiceField({
+    super.key,
+    required this.label,
+    required this.first,
+    required this.last,
+    required this.value,
+    required this.onChanged,
+    this.helper,
+    this.describe,
+    this.descending = false,
+    this.noneLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final values = [for (var v = first; v <= last; v++) v];
+    if (descending) values.sort((a, b) => b.compareTo(a));
+    return SearchableField<int>(
+      label: label,
+      helper: helper,
+      values: values,
+      value: value,
+      noneLabel: noneLabel,
+      describe: (v) => describe?.call(v) ?? '$v',
+      onChanged: onChanged,
+    );
+  }
+}
+
+/// The fifty states and the District of Columbia, which §7.6 says ship at
+/// launch. Territories are excluded: Puerto Rico in particular runs a code that
+/// is a separate system rather than a state-style layer on the federal one.
+const usStateCodes = <String, String>{
+  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
+  'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
+  'DC': 'District of Columbia', 'FL': 'Florida', 'GA': 'Georgia',
+  'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana',
+  'IA': 'Iowa', 'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana',
+  'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan',
+  'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana',
+  'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire',
+  'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York',
+  'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+  'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania',
+  'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
+  'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+  'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia',
+  'WI': 'Wisconsin', 'WY': 'Wyoming',
+};
+
+const monthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 class EnumField<T extends Enum> extends StatelessWidget {
   final String label;
@@ -188,6 +410,7 @@ class EnumField<T extends Enum> extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           helperText: helper,
+          helperMaxLines: 3,
           border: const OutlineInputBorder(),
         ),
         items: [
@@ -235,6 +458,7 @@ class ChoiceField<T> extends StatelessWidget {
         decoration: InputDecoration(
           labelText: label,
           helperText: helper,
+          helperMaxLines: 3,
           border: const OutlineInputBorder(),
         ),
         items: [

@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 
 /// The one seed both brightnesses are generated from.
 ///
-/// Roamfree's amber (`FFC067`) with Slow Burn's coral in its place. Material 3
-/// derives the whole palette from this, so it is the only colour literal the
-/// app should contain.
-const seedColor = Color(0xFFFF7467);
+/// Material 3 derives the whole palette from this, so it is the only colour
+/// literal the app should contain.
+///
+/// A coral was tried first and read as a warning: a selected chip, a filled
+/// button and a focused field all sat close enough to the error red that every
+/// selection looked like something had gone wrong. Blue carries no such
+/// meaning, which matters in an app whose job is to show a household its own
+/// mistakes without making the rest of the screen shout.
+const seedColor = Color(0xFF67A6FF);
 
 ThemeData lightTheme() => _theme(Brightness.light);
 ThemeData darkTheme() => _theme(Brightness.dark);
