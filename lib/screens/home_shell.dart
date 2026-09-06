@@ -3,7 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/results_panel.dart';
-import 'placeholder_screen.dart';
+import 'accounts_screen.dart';
+import 'debts_screen.dart';
+import 'household_screen.dart';
+import 'income_screen.dart';
+import 'plan_screen.dart';
+import 'spending_screen.dart';
 
 /// The frame every screen fills a slot in.
 ///
@@ -26,55 +31,37 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       label: 'Household',
       icon: Icons.people_outline,
       selectedIcon: Icons.people,
-      build: () => const PlaceholderScreen(
-        title: 'Household',
-        blurb: 'Who is in the plan, when they were born, and how they file.',
-      ),
+      build: () => const HouseholdScreen(),
     ),
     Destination(
       label: 'Income',
       icon: Icons.work_outline,
       selectedIcon: Icons.work,
-      build: () => const PlaceholderScreen(
-        title: 'Income',
-        blurb: 'Salary, self-employment, rentals and pensions.',
-      ),
+      build: () => const IncomeScreen(),
     ),
     Destination(
       label: 'Accounts',
       icon: Icons.savings_outlined,
       selectedIcon: Icons.savings,
-      build: () => const PlaceholderScreen(
-        title: 'Accounts',
-        blurb: 'Balances, contributions and the employer match behind them.',
-      ),
+      build: () => const AccountsScreen(),
     ),
     Destination(
       label: 'Spending',
       icon: Icons.receipt_long_outlined,
       selectedIcon: Icons.receipt_long,
-      build: () => const PlaceholderScreen(
-        title: 'Spending',
-        blurb: 'What the household spends now and what changes at retirement.',
-      ),
+      build: () => const SpendingScreen(),
     ),
     Destination(
       label: 'Debts',
       icon: Icons.credit_card_outlined,
       selectedIcon: Icons.credit_card,
-      build: () => const PlaceholderScreen(
-        title: 'Debts and assets',
-        blurb: 'Mortgages, loans, the house and the car.',
-      ),
+      build: () => const DebtsScreen(),
     ),
     Destination(
       label: 'Plan',
       icon: Icons.insights_outlined,
       selectedIcon: Icons.insights,
-      build: () => const PlaceholderScreen(
-        title: 'Plan',
-        blurb: 'The projection, its bands, and how it has moved over time.',
-      ),
+      build: () => const PlanScreen(),
     ),
   ];
 

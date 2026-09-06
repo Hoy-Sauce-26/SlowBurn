@@ -88,6 +88,39 @@ class Household {
     this.oneTimeEvents = const [],
   });
 
+  /// Entities are immutable and the engine takes the whole household, so an
+  /// edit replaces it rather than mutating in place. That is also what makes
+  /// undo and the input digest (§10.1) cheap.
+  Household copyWith({
+    ExpenseSharing? expenseSharing,
+    List<TaxUnit>? taxUnits,
+    List<Person>? people,
+    List<Employer>? employers,
+    List<IncomeStream>? incomeStreams,
+    List<Account>? accounts,
+    List<PayrollDeduction>? payrollDeductions,
+    List<Asset>? assets,
+    List<Liability>? liabilities,
+    List<ExpenseCategory>? expenseCategories,
+    List<ExpenseItem>? expenseItems,
+    List<OneTimeEvent>? oneTimeEvents,
+  }) =>
+      Household(
+        id: id,
+        expenseSharing: expenseSharing ?? this.expenseSharing,
+        taxUnits: taxUnits ?? this.taxUnits,
+        people: people ?? this.people,
+        employers: employers ?? this.employers,
+        incomeStreams: incomeStreams ?? this.incomeStreams,
+        accounts: accounts ?? this.accounts,
+        payrollDeductions: payrollDeductions ?? this.payrollDeductions,
+        assets: assets ?? this.assets,
+        liabilities: liabilities ?? this.liabilities,
+        expenseCategories: expenseCategories ?? this.expenseCategories,
+        expenseItems: expenseItems ?? this.expenseItems,
+        oneTimeEvents: oneTimeEvents ?? this.oneTimeEvents,
+      );
+
   Person? personById(Id id) =>
       people.where((p) => p.id == id).firstOrNull;
 

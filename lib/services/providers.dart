@@ -23,7 +23,77 @@ class HouseholdNotifier extends Notifier<Household> {
   Household build() => const Household(id: 'h1');
 
   void replace(Household household) => state = household;
+
+  /// Upsert by id, since an editor either creates or edits and the screens
+  /// should not have to know which.
+  static List<T> _upsert<T>(List<T> items, T item, Id Function(T) idOf) {
+    final index = items.indexWhere((e) => idOf(e) == idOf(item));
+    final copy = [...items];
+    if (index >= 0) {
+      copy[index] = item;
+    } else {
+      copy.add(item);
+    }
+    return copy;
+  }
+
+  static List<T> _without<T>(List<T> items, Id id, Id Function(T) idOf) =>
+      items.where((e) => idOf(e) != id).toList();
+
+  void savePerson(Person p) =>
+      state = state.copyWith(people: _upsert(state.people, p, (e) => e.id));
+  void removePerson(Id id) =>
+      state = state.copyWith(people: _without(state.people, id, (e) => e.id));
+
+  void saveTaxUnit(TaxUnit t) => state =
+      state.copyWith(taxUnits: _upsert(state.taxUnits, t, (e) => e.id));
+  void removeTaxUnit(Id id) => state =
+      state.copyWith(taxUnits: _without(state.taxUnits, id, (e) => e.id));
+
+  void saveEmployer(Employer e) => state =
+      state.copyWith(employers: _upsert(state.employers, e, (x) => x.id));
+  void removeEmployer(Id id) => state =
+      state.copyWith(employers: _without(state.employers, id, (x) => x.id));
+
+  void saveIncomeStream(IncomeStream s) => state = state.copyWith(
+      incomeStreams: _upsert(state.incomeStreams, s, (e) => e.id));
+  void removeIncomeStream(Id id) => state = state.copyWith(
+      incomeStreams: _without(state.incomeStreams, id, (e) => e.id));
+
+  void saveAccount(Account a) =>
+      state = state.copyWith(accounts: _upsert(state.accounts, a, (e) => e.id));
+  void removeAccount(Id id) =>
+      state = state.copyWith(accounts: _without(state.accounts, id, (e) => e.id));
+
+  void saveCategory(ExpenseCategory c) => state = state.copyWith(
+      expenseCategories: _upsert(state.expenseCategories, c, (e) => e.id));
+  void removeCategory(Id id) => state = state.copyWith(
+      expenseCategories: _without(state.expenseCategories, id, (e) => e.id));
+
+  void saveExpenseItem(ExpenseItem i) => state = state.copyWith(
+      expenseItems: _upsert(state.expenseItems, i, (e) => e.id));
+  void removeExpenseItem(Id id) => state = state.copyWith(
+      expenseItems: _without(state.expenseItems, id, (e) => e.id));
+
+  void saveLiability(Liability l) => state = state.copyWith(
+      liabilities: _upsert(state.liabilities, l, (e) => e.id));
+  void removeLiability(Id id) => state = state.copyWith(
+      liabilities: _without(state.liabilities, id, (e) => e.id));
+
+  void saveAsset(Asset a) =>
+      state = state.copyWith(assets: _upsert(state.assets, a, (e) => e.id));
+  void removeAsset(Id id) =>
+      state = state.copyWith(assets: _without(state.assets, id, (e) => e.id));
 }
+
+/// A fresh id. Local-only storage means nothing has to coordinate these, so
+/// time plus a counter is enough and reads better in an export than a uuid.
+String newId(String prefix) {
+  _idCounter++;
+  return '$prefix-${DateTime.now().millisecondsSinceEpoch}-$_idCounter';
+}
+
+int _idCounter = 0;
 
 final scenarioProvider =
     NotifierProvider<ScenarioNotifier, Scenario>(ScenarioNotifier.new);
