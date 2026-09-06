@@ -33,6 +33,9 @@ class Draw {
   /// A cash buffer was drawn below its target (§4.5).
   final bool bufferDepleted;
 
+  /// The MAGI ceiling had to be crossed to fund the year (§8.4.4).
+  final bool magiCeilingBreached;
+
   const Draw({
     required this.total,
     required this.ordinaryIncome,
@@ -40,7 +43,39 @@ class Draw {
     required this.penalties,
     required this.shortfall,
     required this.bufferDepleted,
+    this.magiCeilingBreached = false,
   });
+}
+
+/// §8.4.4. How much MAGI-counting income a draw may create before it costs the
+/// household its premium tax credit.
+///
+/// Rather than solving jointly for the withdrawal mix that maximises lifetime
+/// after-tax-and-premium spending, a real optimisation problem (§13.3), the
+/// configured order becomes a heuristic ceiling. Null means no ceiling applies:
+/// nobody in the household is buying their own pre-65 coverage.
+Money? magiCeilingFor({
+  required Household household,
+  required Assumptions assumptions,
+  required TaxYear taxYear,
+  required Money magiSoFar,
+  required int year,
+}) {
+  var anyCovered = false;
+  var ceiling = Money.zero;
+  for (final unit in household.taxUnits) {
+    final people = household.peopleIn(unit).toList();
+    final covered = people.where((p) =>
+        p.ageIn(year) < 65 &&
+        year > (p.employerHealthCoverageEndYear ?? -1 << 31));
+    if (covered.isEmpty) continue;
+    anyCovered = true;
+    final size = people.length + unit.activeDependents(year).length;
+    final poverty = taxYear.povertyLevel(unit.stateCode, size);
+    ceiling += poverty * assumptions.acaMagiCeilingPercentOfFpl;
+  }
+  if (!anyCovered) return null;
+  return (ceiling - magiSoFar).orZeroIfNegative;
 }
 
 /// §8.4.1. Source [gap] through the scenario's withdrawal order.
@@ -54,11 +89,17 @@ Draw sourceGap(
   required TaxYear taxYear,
   required int year,
   required Money annualExpenses,
+  /// §8.4.4. How much MAGI-counting income this draw may create before the
+  /// premium tax credit starts to cost more than the draw is worth. Null means
+  /// no ceiling applies.
+  Money? magiHeadroom,
 }) {
   var remaining = gap.orZeroIfNegative;
   var ordinary = Money.zero;
   var gains = Money.zero;
   var bufferDepleted = false;
+  var breached = false;
+  var headroom = magiHeadroom;
   final penalties = <Id, ({Money early, Money hsa})>{};
 
   void penalise(Id taxUnitId, {Money? early, Money? hsa}) {
@@ -103,7 +144,34 @@ Draw sourceGap(
       }
       if (!available.isPositive) continue;
 
-      final take = minMoney(remaining, available);
+      // The ceiling binds only the MAGI-counting sources; the non-MAGI ones are
+      // drawn freely, and the engine spends them first precisely so the
+      // counting draws stay small (§8.4.4).
+      var take = minMoney(remaining, available);
+      if (headroom != null) {
+        switch (source) {
+          case WithdrawalSource.traditional:
+          case WithdrawalSource.rothEarnings:
+          case WithdrawalSource.hsaNonMedical:
+            take = minMoney(take, headroom);
+          case WithdrawalSource.taxable:
+            // Bound partially: only the gain fraction counts, so a ceiling with
+            // $10,000 of headroom against an account that is 30% gain permits a
+            // draw of about $33,000. The fraction is the account's own basis
+            // ratio, which falls out of §6.3 without an assumption.
+            final gainShare =
+                state.gainPortionOf(Money.dollars(1)).ratioTo(Money.dollars(1));
+            if (gainShare > 0) {
+              take = minMoney(take, headroom / gainShare);
+            }
+          case WithdrawalSource.cash:
+          case WithdrawalSource.rothIraBasis:
+          case WithdrawalSource.hsaQualifiedMedical:
+            break;
+        }
+      }
+      if (!take.isPositive) continue;
+
       if (source == WithdrawalSource.taxable) {
         gains += state.gainPortionOf(take);
       }
@@ -111,6 +179,18 @@ Draw sourceGap(
           fromRothBasis: source == WithdrawalSource.rothIraBasis);
       if (taken.isZero) continue;
       remaining -= taken;
+
+      if (headroom != null) {
+        final counting = switch (source) {
+          WithdrawalSource.taxable => state.gainPortionOf(taken),
+          WithdrawalSource.traditional ||
+          WithdrawalSource.rothEarnings ||
+          WithdrawalSource.hsaNonMedical =>
+            taken,
+          _ => Money.zero,
+        };
+        headroom = (headroom! - counting).orZeroIfNegative;
+      }
 
       switch (source) {
         case WithdrawalSource.traditional:
@@ -135,6 +215,30 @@ Draw sourceGap(
           break; // only the gain portion counts, already recorded
       }
     }
+  }
+
+  // Only once the non-MAGI balances are exhausted and the year is still not
+  // covered does the engine breach the ceiling, accepting the subsidy loss
+  // rather than under-funding the year (§8.4.4).
+  if (remaining.isPositive && magiHeadroom != null) {
+    breached = true;
+    final unbound = sourceGap(
+      remaining,
+      household: household,
+      accounts: accounts,
+      assumptions: assumptions,
+      taxYear: taxYear,
+      year: year,
+      annualExpenses: annualExpenses,
+    );
+    remaining -= unbound.total;
+    ordinary += unbound.ordinaryIncome;
+    gains += unbound.realizedGains;
+    unbound.penalties.forEach((unit, p) {
+      penalise(unit,
+          early: p.earlyRetirementDraws, hsa: p.hsaNonMedicalDraws);
+    });
+    if (unbound.bufferDepleted) bufferDepleted = true;
   }
 
   // Everything else exhausted: breach the buffer rather than fail (§4.5).
@@ -166,6 +270,7 @@ Draw sourceGap(
     },
     shortfall: remaining.isPositive,
     bufferDepleted: bufferDepleted,
+    magiCeilingBreached: breached,
   );
 }
 

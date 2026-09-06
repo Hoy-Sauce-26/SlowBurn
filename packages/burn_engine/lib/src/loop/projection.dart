@@ -16,9 +16,12 @@ import '../pipeline/income_tax.dart';
 import '../pipeline/year.dart';
 import '../pipeline/allocation.dart';
 import '../taxyear/tax_year.dart';
+import '../enums.dart';
 import '../types.dart';
 import 'account_state.dart';
 import 'amortization.dart';
+import '../solve/embedded_rates.dart';
+import 'flags.dart';
 import 'measures.dart';
 import 'waterfall.dart';
 import 'withdrawals.dart';
@@ -28,6 +31,10 @@ class ProjectedYear {
   final int year;
   final double frac;
   final YearResult solved;
+
+  /// §8.2's two rates as this year's balances priced them.
+  final EmbeddedRates embeddedRates;
+
   final NetWorth netWorth;
   final Money contributed;
   final Money employerMatch;
@@ -39,6 +46,7 @@ class ProjectedYear {
     required this.year,
     required this.frac,
     required this.solved,
+    required this.embeddedRates,
     required this.netWorth,
     required this.contributed,
     required this.employerMatch,
@@ -72,8 +80,9 @@ Projection project(
   required DateTime asOfDate,
   required int? retirementYear,
   BandName band = BandName.expected,
-  Rate projectedLtcgRate = 0.15,
-  Rate effectiveRetirementTaxRate = 0.15,
+  /// Overrides the per-year derivation, for tests that want a fixed rate.
+  Rate? projectedLtcgRate,
+  Rate? effectiveRetirementTaxRate,
 }) {
   final currentYear = asOfDate.year;
   final horizon = _horizon(household, assumptions, currentYear);
@@ -159,6 +168,39 @@ Projection project(
       }
     }
 
+    // §8.4.1's assumed rollover. A designated Roth balance is unreachable as
+    // basis until it moves, so at the person's retirement year the engine moves
+    // it into their Roth IRA, creating one if absent, and says it did.
+    if (retirementYear != null && year == retirementYear) {
+      for (final person in household.people) {
+        final designated = household
+            .accountsFor(person.id)
+            .where((a) =>
+                a.taxTreatment == TaxTreatment.roth &&
+                a.limitFamily == LimitFamily.electiveDeferral)
+            .toList();
+        if (designated.isEmpty) continue;
+        final target = household
+            .accountsFor(person.id)
+            .where((a) => a.kind == AccountKind.rothIra)
+            .map((a) => accounts[a.id])
+            .whereType<AccountState>()
+            .firstOrNull;
+        if (target == null) continue;
+        for (final source in designated) {
+          final from = accounts[source.id];
+          if (from == null || !from.balance.isPositive) continue;
+          final movedBasis = from.rothContributionBasis;
+          final moved = from.balance;
+          from.balance = Money.zero;
+          from.rothContributionBasis = Money.zero;
+          target.balance += moved;
+          target.rothContributionBasis += movedBasis;
+          flags.add('rothRolloverAssumed');
+        }
+      }
+    }
+
     // RMDs come off the top of the year, as cash in hand before it is priced.
     final rmds = requiredMinimumDistributions(
       household: household,
@@ -180,6 +222,29 @@ Projection project(
       }
     }
 
+    // Sweep 1 lands before §4.1: hsaPayrollToLimit is the one step that reduces
+    // FICA wages, and an election settled later would miss ficaExempt and
+    // overstate payroll tax for the whole accumulation phase (§4.4.2).
+    final projectedEarned = {
+      for (final person in household.people)
+        person.id: sumMoney(household
+            .streamsFor(person.id)
+            .where((s) => s.kind.isEarned)
+            .map((s) => s.resolvedAmount(year, currentYear: currentYear))),
+    };
+    final election = runElectionSweep(
+      household,
+      assumptions: assumptions,
+      taxYear: taxYear,
+      accounts: accounts,
+      liabilities: liabilities,
+      earnedIncome: projectedEarned,
+      projectedSurplus: _projectedSurplus(
+        household, projectedEarned, year, currentYear, retirementYear),
+      annualExpenses: Money.zero,
+      year: year,
+    );
+
     // §4.1 onward on FULL-YEAR figures, with the fixed point solved.
     var solved = solveYear(
       household,
@@ -189,6 +254,7 @@ Projection project(
       year: year,
       currentYear: currentYear,
       retirementYear: retirementYear,
+      proposedContributions: election.toAccounts,
       inputs: YearInputs(
         rmdIncome: rmdTotal,
         assetSaleTaxableGain: assetSaleGain,
@@ -234,6 +300,25 @@ Projection project(
     };
     final annualExpenses = solved.cashFlow.annualExpenses;
 
+    // Money already withheld from a paycheck against a year that turned out
+    // not to support it. A payrollElection is never unwound, since a deferral
+    // already taken cannot be undone at year end, so the year runs short and
+    // draws the buffer instead. That is what happens to a real household that
+    // set its deferral too high, and it is visible rather than quietly
+    // smoothed away (§4.4.4). It covers the user's own committed deferral as
+    // well as sweep 1's election, since both are withheld the same way.
+    final withheld = sumMoney(solved.contributions.where((c) {
+      final account = household.accountById(c.accountId);
+      if (account == null) return false;
+      return account.limitFamily == LimitFamily.electiveDeferral ||
+          account.limitFamily == LimitFamily.simpleDeferral ||
+          (account.limitFamily == LimitFamily.hsa &&
+              account.contribution.reducesFicaWages);
+    }).map((c) => c.employee));
+    if (withheld.isPositive && solved.netSurplus.isNegative) {
+      flags.add('electionExceededRealizedSurplus');
+    }
+
     var drawn = Money.zero;
     if (solved.netSurplus.isNegative) {
       // The drawdown carries a fixed point of its own: a traditional draw is
@@ -249,10 +334,19 @@ Projection project(
           taxYear: taxYear,
           year: year,
           annualExpenses: annualExpenses,
+          magiHeadroom: magiCeilingFor(
+            household: household,
+            assumptions: assumptions,
+            taxYear: taxYear,
+            magiSoFar: sumMoney(solved.incomes.map((i) => i.federalAgi)),
+            year: year,
+          ),
         );
         drawn += draw.total;
         if (draw.shortfall) flags.add('shortfall');
         if (draw.bufferDepleted) flags.add('bufferDepleted');
+        // An RMD can breach it involuntarily, which is the point of the flag.
+        if (draw.magiCeilingBreached) flags.add('magiCeilingBreached');
 
         final repriced = solveYear(
           household,
@@ -319,10 +413,47 @@ Projection project(
       );
     }
 
+    // §8.2's two rates, from this year's actual balances rather than an
+    // assumption. Derived after the year is solved, since the draw they price
+    // is one year of this household's own cost of living.
+    final rates = deriveEmbeddedRates(
+      household: household,
+      balances: {for (final e in accounts.entries) e.key: e.value.balance},
+      costBases: {for (final e in accounts.entries) e.key: e.value.costBasis},
+      rothBases: {
+        for (final e in accounts.entries) e.key: e.value.rothContributionBasis
+      },
+      assumptions: assumptions,
+      taxYear: taxYear,
+      assetClasses: assetClasses,
+      retirementAnnualExpenses: annualExpenses,
+      year: year,
+      currentYear: currentYear,
+    );
+
+    flags.addAll(yearFlags(
+      household: household,
+      assumptions: assumptions,
+      taxYear: taxYear,
+      wages: solved.wages,
+      incomes: solved.incomes,
+      owed: solved.owed,
+      contributions: solved.contributions,
+      liabilities: liabilities,
+      asOfDate: asOfDate,
+      year: year,
+    ));
+    flags.addAll(doubleCountFlags(household));
+    if (retirementYear != null &&
+        swrHorizonMismatch(assumptions, horizon - retirementYear + 1)) {
+      flags.add('swrHorizonMismatch');
+    }
+
     years.add(ProjectedYear(
       year: year,
       frac: frac,
       solved: solved,
+      embeddedRates: rates,
       netWorth: computeNetWorth(
         household: household,
         accounts: accounts,
@@ -331,8 +462,9 @@ Projection project(
         assumptions: assumptions,
         annualExpenses: annualExpenses,
         year: year,
-        projectedLtcgRate: projectedLtcgRate,
-        effectiveRetirementTaxRate: effectiveRetirementTaxRate,
+        projectedLtcgRate: projectedLtcgRate ?? rates.projectedLtcgRate,
+        effectiveRetirementTaxRate:
+            effectiveRetirementTaxRate ?? rates.effectiveRetirementTaxRate,
       ),
       contributed: contributed,
       employerMatch: matched,
@@ -349,6 +481,30 @@ Projection project(
 
 /// The year the youngest person reaches `projectionHorizonAge`, so the
 /// portfolio has to outlast whoever will need it longest (§8.2).
+/// What sweep 1 has to guess at, since it runs before the year is priced: pay
+/// less a rough allowance for tax, less this year's living costs.
+///
+/// Deliberately conservative. An election is withheld from a paycheck and
+/// cannot be handed back, so guessing low costs the household some tax-advantaged
+/// room it could have used, and guessing high costs it a shortfall it cannot
+/// undo. §4.4.3's fixed point then prices whatever was elected exactly.
+Money _projectedSurplus(
+  Household household,
+  Map<Id, Money> earned,
+  int year,
+  int currentYear,
+  int? retirementYear,
+) {
+  final pay = sumMoney(earned.values);
+  final expenses = sumMoney(household.expenseItems.map((i) => i.amountIn(
+        year,
+        currentYear: currentYear,
+        retirementYear: retirementYear,
+        categoryDefaultInflation: 0,
+      )));
+  return (pay * 0.70 - expenses).orZeroIfNegative;
+}
+
 int _horizon(Household household, Assumptions assumptions, int currentYear) {
   if (household.people.isEmpty) return currentYear;
   final youngest = household.people

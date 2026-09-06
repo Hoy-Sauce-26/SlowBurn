@@ -2063,11 +2063,18 @@ r       = safeWithdrawalRate
 S(t)    = projected retirement spending in year t, for t = 0 .. N−1
 
 pv      = Σ S(t) / (1 + r)^t
-annuity = Σ 1    / (1 + r)^t   ≡  (1 − (1 + r)^−N) / r
+annuity = Σ 1    / (1 + r)^t   ≡  (1 + r) × (1 − (1 + r)^−N) / r
 
 levelEquivalentRetirementExpenses = pv / annuity
 fireNumber                        = levelEquivalentRetirementExpenses / r
 ```
+
+**Both sums run over the same `t`, and the `(1 + r)` is what makes the closed form agree
+with that.** Spending starts at retirement rather than a year after it, so `t` begins at 0,
+and the textbook factor `(1 − (1 + r)^−N) / r` sums from 1. Either range gives the same
+`fireNumber`, since `pv / annuity` cancels the difference. Mixing them does not cancel:
+pricing the worked household below with a `t = 0` numerator against the textbook
+denominator gives $85,109 where the answer is $82,231.
 
 `safeWithdrawalRate` is a **real** rate, consistent with §1.1, and strictly positive over a
 horizon of at least one year, since it and the annuity are both denominators here
