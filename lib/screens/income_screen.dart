@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/providers.dart';
+import '../services/flag_placement.dart';
 import '../widgets/entity_list.dart';
+import '../widgets/flag_banner.dart';
 import '../widgets/fields.dart';
 
 /// §3.3. What the household earns, and for how long.
@@ -29,8 +31,18 @@ class IncomeScreen extends ConsumerWidget {
               'a pension or rental does not.'
           : 'Add a person first: income belongs to someone, since the wage base '
               'and every contribution limit are per individual.',
+      banner: const FlagBanner(home: FlagHome.income),
       onAdd: canAdd ? () => _edit(context, ref, null) : null,
       children: [
+        for (final employer in household.employers)
+          EntityTile(
+            icon: Icons.business_outlined,
+            title: employer.label,
+            subtitle: _employerSummary(employer, household),
+            onTap: () => _editEmployer(context, ref, employer),
+            onDelete: () => notifier.removeEmployer(employer.id),
+          ),
+        if (household.employers.isNotEmpty) const SizedBox(height: 4),
         for (final stream in household.incomeStreams)
           EntityTile(
             icon: stream.kind.isEarned
@@ -42,7 +54,187 @@ class IncomeScreen extends ConsumerWidget {
             onTap: () => _edit(context, ref, stream),
             onDelete: () => notifier.removeIncomeStream(stream.id),
           ),
+        for (final deduction in household.payrollDeductions)
+          EntityTile(
+            icon: Icons.medical_services_outlined,
+            title: deduction.label,
+            subtitle: '${humanise(deduction.kind.name)} · '
+                '${deduction.reducesFicaWages ? 'reduces FICA wages' : 'income tax only'}',
+            trailing: formatMoneyCompact(deduction.annualAmount),
+            onTap: () => _editDeduction(context, ref, deduction),
+            onDelete: () => notifier.removePayrollDeduction(deduction.id),
+          ),
+        if (canAdd)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _editEmployer(context, ref, null),
+                  icon: const Icon(Icons.business_outlined),
+                  label: const Text('Add an employer'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _editDeduction(context, ref, null),
+                  icon: const Icon(Icons.medical_services_outlined),
+                  label: const Text('Add a payroll deduction'),
+                ),
+              ],
+            ),
+          ),
       ],
+    );
+  }
+
+  /// An `Employer` holds no figures of its own. It exists so a stream and an
+  /// account can point at the same one, which is what lets §415(c) and the
+  /// match see the pay behind a plan.
+  static String _employerSummary(Employer e, Household h) {
+    final streams = h.incomeStreams.where((s) => s.employerId == e.id).length;
+    final accounts = h.accounts.where((a) => a.employerId == e.id).length;
+    return '$streams income · $accounts account${accounts == 1 ? '' : 's'}';
+  }
+
+  Future<void> _editEmployer(
+      BuildContext context, WidgetRef ref, Employer? existing) async {
+    final household = ref.read(householdProvider);
+    final notifier = ref.read(householdProvider.notifier);
+    var label = existing?.label ?? '';
+
+    await showEditor<void>(
+      context,
+      title: existing == null ? 'Add an employer' : existing.label,
+      build: (context) => Column(
+        children: [
+          Text(
+            'An employer is just a name two things can point at. Linking a '
+            'job and the plan it sponsors is what lets the engine see the pay '
+            'behind an employer match and the §415(c) ceiling.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          LabelledTextField(
+            label: 'Name',
+            initial: label,
+            onChanged: (v) => label = v,
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              onPressed: () {
+                notifier.saveEmployer(Employer(
+                  id: existing?.id ?? newId('emp'),
+                  householdId: household.id,
+                  label: label.isEmpty ? 'Employer' : label,
+                ));
+                Navigator.of(context).pop();
+              },
+              child: const Text('Save'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// §3.4.5. Pre-tax money that is spent rather than saved.
+  Future<void> _editDeduction(
+      BuildContext context, WidgetRef ref, PayrollDeduction? existing) async {
+    final household = ref.read(householdProvider);
+    final notifier = ref.read(householdProvider.notifier);
+
+    var label = existing?.label ?? '';
+    var personId = existing?.personId ?? household.people.first.id;
+    var kind = existing?.kind ?? PayrollDeductionKind.healthPremium;
+    var amount = existing?.annualAmount ?? Money.zero;
+    var startYear = existing?.startYear;
+    var endYear = existing?.endYear;
+
+    await showEditor<void>(
+      context,
+      title: existing == null ? 'Add a payroll deduction' : existing.label,
+      build: (context) => StatefulBuilder(
+        builder: (context, setState) => Column(
+          children: [
+            Text(
+              'Money that never reaches the paycheck: a health premium, an '
+              'FSA election, a commuter benefit. Cafeteria-plan items under '
+              '§125 also reduce FICA wages, which a 401(k) deferral does not.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            LabelledTextField(
+              label: 'Label',
+              initial: label,
+              onChanged: (v) => label = v,
+            ),
+            const SizedBox(height: 12),
+            FieldRow([
+              EnumField<PayrollDeductionKind>(
+                label: 'Kind',
+                values: PayrollDeductionKind.values,
+                value: kind,
+                onChanged: (v) => setState(() => kind = v),
+              ),
+              MoneyField(
+                label: 'A year',
+                initial: amount,
+                onChanged: (v) => amount = v,
+              ),
+            ]),
+            if (household.people.length > 1)
+              ChoiceField<Person>(
+                label: 'Whose',
+                values: household.people,
+                value: household.personById(personId),
+                describe: (p) => p.displayName,
+                onChanged: (p) => personId = p.id,
+              ),
+            const SizedBox(height: 12),
+            FieldRow([
+              YearField(
+                label: 'Start year',
+                initial: startYear,
+                onChanged: (v) => startYear = v,
+              ),
+              YearField(
+                label: 'End year',
+                helper: kind.isCoverageRelated
+                    ? 'Blank ends it with employer coverage'
+                    : 'Blank ends it at retirement',
+                initial: endYear,
+                onChanged: (v) => endYear = v,
+              ),
+            ]),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: () {
+                  // §125 and §132(f) items reach FICA wages; nothing else does.
+                  final cafeteria = kind != PayrollDeductionKind.other;
+                  notifier.savePayrollDeduction(PayrollDeduction(
+                    id: existing?.id ?? newId('pd'),
+                    personId: personId,
+                    label: label.isEmpty ? humanise(kind.name) : label,
+                    kind: kind,
+                    annualAmount: amount,
+                    reducesFederalTaxableIncome: true,
+                    reducesStateTaxableIncome: true,
+                    reducesFicaWages: cafeteria,
+                    startYear: startYear,
+                    endYear: endYear,
+                  ));
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -72,6 +264,7 @@ class IncomeScreen extends ConsumerWidget {
     var startMonth = existing?.startMonth;
     var endMonth = existing?.endMonth;
     var variability = existing?.variability ?? IncomeVariability.guaranteed;
+    var employerId = existing?.employerId;
 
     await showEditor<void>(
       context,
@@ -144,6 +337,18 @@ class IncomeScreen extends ConsumerWidget {
                 onChanged: (v) => endMonth = v,
               ),
             ]),
+            if (household.employers.isNotEmpty)
+              ChoiceField<Employer?>(
+                label: 'Employer',
+                helper: 'Links this pay to the plan it sponsors',
+                values: [null, ...household.employers],
+                value: household.employers
+                    .where((e) => e.id == employerId)
+                    .firstOrNull,
+                describe: (e) => e?.label ?? 'None',
+                onChanged: (e) => employerId = e?.id,
+              ),
+            if (household.employers.isNotEmpty) const SizedBox(height: 12),
             EnumField<IncomeVariability>(
               label: 'Dependability',
               helper: 'Display only: a plan resting on bonuses is worth seeing',
@@ -159,7 +364,7 @@ class IncomeScreen extends ConsumerWidget {
                   notifier.saveIncomeStream(IncomeStream(
                     id: existing?.id ?? newId('inc'),
                     personId: personId,
-                    employerId: existing?.employerId,
+                    employerId: employerId,
                     label: label.isEmpty ? humanise(kind.name) : label,
                     kind: kind,
                     grossAnnualAmount: amount,

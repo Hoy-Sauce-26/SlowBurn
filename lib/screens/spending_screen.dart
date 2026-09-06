@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/providers.dart';
+import '../services/flag_placement.dart';
 import '../widgets/entity_list.dart';
+import '../widgets/flag_banner.dart';
 import '../widgets/fields.dart';
 
 /// §3.7. What the household spends, and what changes at retirement.
@@ -28,6 +30,7 @@ class SpendingScreen extends ConsumerWidget {
           'Add what the household spends.\nLeave out mortgage payments, '
           'payroll deductions and health premiums: each reaches the plan '
           'through its own term already.',
+      banner: const FlagBanner(home: FlagHome.spending),
       onAdd: () => _edit(context, ref, null),
       children: [
         for (final item in household.expenseItems)
@@ -39,7 +42,143 @@ class SpendingScreen extends ConsumerWidget {
             onTap: () => _edit(context, ref, item),
             onDelete: () => notifier.removeExpenseItem(item.id),
           ),
+        for (final event in household.oneTimeEvents)
+          EntityTile(
+            icon: event.isOutflow
+                ? Icons.remove_circle_outline
+                : Icons.add_circle_outline,
+            title: event.label,
+            subtitle: '${humanise(event.kind.name)} · ${event.year}'
+                '${event.accountId == null ? '' : ' · from an account'}',
+            trailing: formatMoneyCompact(
+                event.isOutflow ? -event.amount : event.amount),
+            onTap: () => _editEvent(context, ref, event),
+            onDelete: () => notifier.removeOneTimeEvent(event.id),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: OutlinedButton.icon(
+            onPressed: () => _editEvent(context, ref, null),
+            icon: const Icon(Icons.event_outlined),
+            label: const Text('Add a one-off'),
+          ),
+        ),
       ],
+    );
+  }
+
+  /// §3.8. A single dated inflow or outflow: an inheritance, a roof, a truck.
+  ///
+  /// An outflow must say where the money comes from, since where the $40,000
+  /// for a truck comes from changes the projection materially and only the
+  /// user knows.
+  Future<void> _editEvent(
+      BuildContext context, WidgetRef ref, OneTimeEvent? existing) async {
+    final household = ref.read(householdProvider);
+    final notifier = ref.read(householdProvider.notifier);
+
+    var label = existing?.label ?? '';
+    var kind = existing?.kind ?? OneTimeEventKind.majorRepair;
+    var year = existing?.year ?? DateTime.now().year + 1;
+    var outflow = existing == null ? true : existing.isOutflow;
+    var amount = existing == null
+        ? Money.zero
+        : (existing.isOutflow ? -existing.amount : existing.amount);
+    // An outflow must name its source (invariant 17), so it starts on one
+    // rather than on nothing the user has to notice is missing.
+    var accountId = existing?.accountId ??
+        (household.accounts.isEmpty ? null : household.accounts.first.id);
+    var treatment = existing?.taxTreatment ?? EventTaxTreatment.nonTaxable;
+
+    await showEditor<void>(
+      context,
+      title: existing == null ? 'Add a one-off' : existing.label,
+      build: (context) => StatefulBuilder(
+        builder: (context, setState) => Column(
+          children: [
+            LabelledTextField(
+              label: 'Label',
+              initial: label,
+              onChanged: (v) => label = v,
+            ),
+            const SizedBox(height: 12),
+            FieldRow([
+              EnumField<OneTimeEventKind>(
+                label: 'Kind',
+                values: OneTimeEventKind.values,
+                value: kind,
+                onChanged: (v) => setState(() => kind = v),
+              ),
+              YearField(
+                label: 'Year',
+                initial: year,
+                onChanged: (v) => year = v ?? year,
+              ),
+            ]),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: true, label: Text('Money out')),
+                ButtonSegment(value: false, label: Text('Money in')),
+              ],
+              selected: {outflow},
+              onSelectionChanged: (s) => setState(() => outflow = s.first),
+            ),
+            const SizedBox(height: 12),
+            FieldRow([
+              MoneyField(
+                label: 'Amount',
+                initial: amount,
+                onChanged: (v) => amount = v,
+              ),
+              if (household.accounts.isNotEmpty)
+                ChoiceField<Account?>(
+                  label: outflow ? 'Paid from' : 'Lands in',
+                  helper: outflow
+                      ? 'Required: where it comes from changes the plan'
+                      : 'Blank leaves it in the year\'s surplus',
+                  values: [if (!outflow) null, ...household.accounts],
+                  value: household.accounts
+                      .where((a) => a.id == accountId)
+                      .firstOrNull,
+                  describe: (a) => a?.label ?? 'Surplus',
+                  onChanged: (a) => accountId = a?.id,
+                ),
+            ]),
+            if (!outflow)
+              EnumField<EventTaxTreatment>(
+                label: 'Taxed as',
+                values: EventTaxTreatment.values,
+                value: treatment,
+                onChanged: (v) => treatment = v,
+              ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: () {
+                  notifier.saveOneTimeEvent(OneTimeEvent(
+                    id: existing?.id ?? newId('ev'),
+                    householdId: household.id,
+                    personId: existing?.personId ??
+                        (household.taxUnits.length > 1
+                            ? household.people.firstOrNull?.id
+                            : null),
+                    label: label.isEmpty ? humanise(kind.name) : label,
+                    year: year,
+                    amount: outflow ? -amount : amount,
+                    kind: kind,
+                    accountId: accountId,
+                    taxTreatment:
+                        outflow ? EventTaxTreatment.nonTaxable : treatment,
+                  ));
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

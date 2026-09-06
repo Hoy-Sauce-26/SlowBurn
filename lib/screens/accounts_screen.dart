@@ -3,8 +3,114 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/providers.dart';
+import '../services/flag_placement.dart';
 import '../widgets/entity_list.dart';
+import '../widgets/flag_banner.dart';
 import '../widgets/fields.dart';
+
+/// §3.4.4. The employer's own contribution formula.
+///
+/// A match needs an employer with pay behind it: compensation of zero yields
+/// no match, which is the right answer for an account no employer sponsors.
+class _MatchEditor extends StatefulWidget {
+  final EmployerMatch? match;
+  final ValueChanged<EmployerMatch?> onChanged;
+
+  const _MatchEditor({required this.match, required this.onChanged});
+
+  @override
+  State<_MatchEditor> createState() => _MatchEditorState();
+}
+
+class _MatchEditorState extends State<_MatchEditor> {
+  late bool _has = widget.match != null;
+  late MatchFormula _formula =
+      widget.match?.formula ?? MatchFormula.percentOfContribution;
+  late double _rate = widget.match?.matchRate ?? 0.5;
+  late double _limit = widget.match?.matchLimitPercentOfSalary ?? 0.06;
+  late VestingSchedule? _vesting = widget.match?.vestingSchedule;
+
+  void _emit() => widget.onChanged(_has
+      ? EmployerMatch(
+          formula: _formula,
+          matchRate: _rate,
+          matchLimitPercentOfSalary: _limit,
+          vestingSchedule: _vesting,
+        )
+      : null);
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Employer matches contributions'),
+            value: _has,
+            onChanged: (v) => setState(() {
+              _has = v;
+              _emit();
+            }),
+          ),
+          if (_has) ...[
+            FieldRow([
+              EnumField<MatchFormula>(
+                label: 'Formula',
+                values: const [
+                  MatchFormula.percentOfContribution,
+                  MatchFormula.percentOfSalary,
+                ],
+                value: _formula == MatchFormula.tiered
+                    ? MatchFormula.percentOfContribution
+                    : _formula,
+                describe: (f) => switch (f) {
+                  MatchFormula.percentOfContribution =>
+                    'A share of what you put in',
+                  MatchFormula.percentOfSalary => 'A share of your salary',
+                  MatchFormula.tiered => 'Tiered',
+                },
+                onChanged: (v) => setState(() {
+                  _formula = v;
+                  _emit();
+                }),
+              ),
+              PercentField(
+                label: 'Match rate',
+                helper: '50% for a half match',
+                initial: _rate,
+                onChanged: (v) {
+                  _rate = v;
+                  _emit();
+                },
+              ),
+            ]),
+            FieldRow([
+              PercentField(
+                label: 'Up to, of salary',
+                helper: '"50% of the first 6%"',
+                initial: _limit,
+                onChanged: (v) {
+                  _limit = v;
+                  _emit();
+                },
+              ),
+              YearField(
+                label: 'Vests after, years',
+                helper: 'Blank vests immediately. Warning only: the engine '
+                    'counts the match in full.',
+                initial: switch (_vesting) {
+                  CliffVesting(:final years) => years,
+                  _ => null,
+                },
+                onChanged: (v) {
+                  _vesting = v == null ? null : CliffVesting(v);
+                  _emit();
+                },
+              ),
+            ]),
+          ],
+        ],
+      );
+}
 
 /// §3.4. Balances and the contributions that feed them.
 ///
@@ -29,6 +135,7 @@ class AccountsScreen extends ConsumerWidget {
           ? 'Add what the household has saved.\nA 529 counts toward net worth '
               'and is spent only on education; everything else is reachable.'
           : 'Add a person first: every contribution limit is per individual.',
+      banner: const FlagBanner(home: FlagHome.accounts),
       onAdd: canAdd ? () => _edit(context, ref, null) : null,
       children: [
         for (final account in household.accounts)
@@ -75,6 +182,9 @@ class AccountsScreen extends ConsumerWidget {
     var buffer = existing?.targetBalanceMonths;
     var mode = existing?.contribution.mode ?? ContributionMode.percentOfGross;
     var contribution = existing?.contribution.value ?? 0.0;
+    var employerId = existing?.employerId;
+    var match = existing?.contribution.employerMatch;
+    var contributionEnd = existing?.contribution.endYear;
 
     await showEditor<void>(
       context,
@@ -149,6 +259,34 @@ class AccountsScreen extends ConsumerWidget {
                     onChanged: (v) => contribution = v.cents.toDouble(),
                   ),
               ]),
+              if (household.employers.isNotEmpty &&
+                  defaultLimitFamily(kind) == LimitFamily.electiveDeferral) ...[
+                ChoiceField<Employer?>(
+                  label: 'Sponsored by',
+                  helper: 'Links the plan to the pay behind it, which is what '
+                      'bounds the match and the §415(c) ceiling',
+                  values: [null, ...household.employers],
+                  value: household.employers
+                      .where((e) => e.id == employerId)
+                      .firstOrNull,
+                  describe: (e) => e?.label ?? 'No employer',
+                  onChanged: (e) => setState(() => employerId = e?.id),
+                ),
+                const SizedBox(height: 12),
+                if (employerId != null)
+                  _MatchEditor(
+                    match: match,
+                    onChanged: (m) => match = m,
+                  ),
+              ],
+              YearField(
+                label: 'Stop contributing after',
+                helper: 'Blank stops it at retirement. Coast FIRE sets this '
+                    'and trims the waterfall.',
+                initial: contributionEnd,
+                onChanged: (v) => contributionEnd = v,
+              ),
+              const SizedBox(height: 12),
               FieldRow([
                 ChoiceField<AssetClass>(
                   label: 'Invested in',
@@ -192,7 +330,7 @@ class AccountsScreen extends ConsumerWidget {
                       isRestrictedPurpose: isRestrictedPurpose(treatment),
                       assetAllocationId: allocationId,
                       targetBalanceMonths: buffer,
-                      employerId: existing?.employerId,
+                      employerId: employerId,
                       contribution: Contribution(
                         mode: mode,
                         value: contribution,
@@ -204,7 +342,8 @@ class AccountsScreen extends ConsumerWidget {
                                     .map((s) => s.id)
                                     .toList()
                                 : const [],
-                        employerMatch: existing?.contribution.employerMatch,
+                        employerMatch: employerId == null ? null : match,
+                        endYear: contributionEnd,
                         reducesFederalTaxableIncome: flags.federal,
                         reducesStateTaxableIncome: flags.state,
                         reducesFicaWages: flags.fica,

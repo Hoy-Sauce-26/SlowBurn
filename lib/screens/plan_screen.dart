@@ -2,7 +2,10 @@ import 'package:burn_engine/burn_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/flag_placement.dart';
 import '../services/providers.dart';
+import '../widgets/flag_banner.dart';
+import '../widgets/variant_picker.dart';
 import '../widgets/fields.dart';
 import '../widgets/metric_card.dart';
 
@@ -31,7 +34,21 @@ class PlanScreen extends ConsumerWidget {
           style: theme.textTheme.bodyMedium
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: () => showVariantPicker(context, ref),
+          icon: const Icon(Icons.auto_awesome_outlined),
+          label: const Text('Shape the plan'),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Coast, Barista, traditional retirement: each is a set of entries '
+          'rather than a mode, so you can change any of it afterwards.',
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
         const SizedBox(height: 24),
+        const FlagBanner(home: FlagHome.plan, inset: false),
         projection.when(
           loading: () =>
               const Center(child: CircularProgressIndicator()),

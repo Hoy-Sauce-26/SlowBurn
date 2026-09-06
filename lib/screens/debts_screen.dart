@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/providers.dart';
+import '../services/flag_placement.dart';
 import '../widgets/entity_list.dart';
+import '../widgets/flag_banner.dart';
 import '../widgets/fields.dart';
 
 /// §3.5 and §3.6. Debts and the things they are secured against.
@@ -26,6 +28,7 @@ class DebtsScreen extends ConsumerWidget {
           'Add what the household owes and owns.\nDebt service reaches the plan '
           'on its own, so it needs no spending line, and escrow keeps being '
           'paid after a mortgage is gone.',
+      banner: const FlagBanner(home: FlagHome.debts),
       onAdd: () => _editLiability(context, ref, null),
       children: [
         for (final debt in household.liabilities)

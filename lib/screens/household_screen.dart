@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/providers.dart';
+import '../services/flag_placement.dart';
 import '../widgets/entity_list.dart';
+import '../widgets/flag_banner.dart';
 import '../widgets/fields.dart';
 
 /// §3.1 and §3.2. Who is in the plan, and how they file.
@@ -26,6 +28,7 @@ class HouseholdScreen extends ConsumerWidget {
       emptyMessage:
           'Start with yourself.\nBirth date drives 59½ access, catch-up '
           'eligibility, Medicare at 65 and Social Security.',
+      banner: const FlagBanner(home: FlagHome.household),
       onAdd: () => _editPerson(context, ref, null),
       children: [
         for (final unit in household.taxUnits)
@@ -51,6 +54,8 @@ class HouseholdScreen extends ConsumerWidget {
         'Retiring at ${p.plannedRetirementAge}'
       else
         'Retirement year solved for',
+      if (p.socialSecurity != null)
+        'Claims at ${p.socialSecurity!.claimingAge}',
     ];
     return parts.join(' · ');
   }
@@ -77,6 +82,13 @@ class HouseholdScreen extends ConsumerWidget {
     var birthMonth = existing?.birthDate.month ?? 6;
     var plannedAge = existing?.plannedRetirementAge;
     var coverageEnd = existing?.employerHealthCoverageEndYear;
+    var hsaTier = existing?.hsaCoverage.lastOrNull?.tier ?? HsaTier.none;
+    var benefit = existing?.socialSecurity;
+    var hasBenefit = benefit != null;
+    var benefitAmount =
+        benefit?.estimatedMonthlyBenefitAtFra ?? Money.zero;
+    var claimingAge = benefit?.claimingAge ?? 67;
+    var countOnIt = benefit?.includeInProjection ?? true;
 
     await showEditor<void>(
       context,
@@ -117,20 +129,80 @@ class HouseholdScreen extends ConsumerWidget {
                 onChanged: (v) => coverageEnd = v,
               ),
             ]),
+            EnumField<HsaTier>(
+              label: 'HSA coverage',
+              helper: 'Which HSA limit applies, and whether one applies at all',
+              values: HsaTier.values,
+              value: hsaTier,
+              describe: (t) => switch (t) {
+                HsaTier.none => 'No HSA-eligible plan',
+                HsaTier.self => 'Self only',
+                HsaTier.family => 'Family',
+              },
+              onChanged: (v) => setState(() => hsaTier = v),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Include Social Security'),
+              subtitle: const Text(
+                  'From your SSA statement, at full retirement age'),
+              value: hasBenefit,
+              onChanged: (v) => setState(() => hasBenefit = v),
+            ),
+            if (hasBenefit) ...[
+              FieldRow([
+                MoneyField(
+                  label: 'Monthly benefit at FRA',
+                  helper: 'Adjusted once for when you claim',
+                  initial: benefitAmount,
+                  onChanged: (v) => benefitAmount = v,
+                ),
+                YearField(
+                  label: 'Claiming age',
+                  helper: '62 to 70. Later is a larger benefit.',
+                  initial: claimingAge,
+                  onChanged: (v) => claimingAge = (v ?? 67).clamp(62, 70),
+                ),
+              ]),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Count on it'),
+                subtitle: const Text(
+                    'Off leaves it out of this person\'s plan'),
+                value: countOnIt,
+                onChanged: (v) => setState(() => countOnIt = v),
+              ),
+            ],
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton(
                 onPressed: () {
+                  final id = existing?.id ?? newId('p');
                   notifier.savePerson(Person(
-                    id: existing?.id ?? newId('p'),
+                    id: id,
                     displayName: name.isEmpty ? 'Unnamed' : name,
                     birthDate: DateTime(birthYear, birthMonth, 15),
                     taxUnitId: unitId,
                     plannedRetirementAge: plannedAge,
-                    hsaCoverage: existing?.hsaCoverage ?? const [],
+                    hsaCoverage: hsaTier == HsaTier.none
+                        ? const []
+                        : [
+                            HsaCoverageEntry(
+                              fromYear: DateTime.now().year,
+                              tier: hsaTier,
+                            )
+                          ],
                     employerHealthCoverageEndYear: coverageEnd,
-                    socialSecurity: existing?.socialSecurity,
+                    socialSecurity: hasBenefit
+                        ? SocialSecurityBenefit(
+                            personId: id,
+                            estimatedMonthlyBenefitAtFra: benefitAmount,
+                            claimingAge: claimingAge,
+                            includeInProjection: countOnIt,
+                          )
+                        : null,
                   ));
                   Navigator.of(context).pop();
                 },

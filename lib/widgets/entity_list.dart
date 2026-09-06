@@ -15,6 +15,10 @@ class EntityList extends StatelessWidget {
   /// Shown in place of the list when it is empty.
   final String emptyMessage;
 
+  /// The flags this screen owns, shown between the heading and the list so
+  /// they are read before the thing they are about.
+  final Widget? banner;
+
   const EntityList({
     super.key,
     required this.title,
@@ -23,6 +27,7 @@ class EntityList extends StatelessWidget {
     required this.emptyMessage,
     required this.children,
     this.onAdd,
+    this.banner,
   });
 
   @override
@@ -46,6 +51,7 @@ class EntityList extends StatelessWidget {
             ],
           ),
         ),
+        ?banner,
         Expanded(
           child: children.isEmpty
               ? Center(

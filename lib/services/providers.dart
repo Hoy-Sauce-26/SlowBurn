@@ -80,6 +80,16 @@ class HouseholdNotifier extends Notifier<Household> {
   void removeLiability(Id id) => state = state.copyWith(
       liabilities: _without(state.liabilities, id, (e) => e.id));
 
+  void savePayrollDeduction(PayrollDeduction d) => state = state.copyWith(
+      payrollDeductions: _upsert(state.payrollDeductions, d, (e) => e.id));
+  void removePayrollDeduction(Id id) => state = state.copyWith(
+      payrollDeductions: _without(state.payrollDeductions, id, (e) => e.id));
+
+  void saveOneTimeEvent(OneTimeEvent e) => state = state.copyWith(
+      oneTimeEvents: _upsert(state.oneTimeEvents, e, (x) => x.id));
+  void removeOneTimeEvent(Id id) => state = state.copyWith(
+      oneTimeEvents: _without(state.oneTimeEvents, id, (x) => x.id));
+
   void saveAsset(Asset a) =>
       state = state.copyWith(assets: _upsert(state.assets, a, (e) => e.id));
   void removeAsset(Id id) =>
