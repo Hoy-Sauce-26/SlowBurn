@@ -75,9 +75,9 @@ class IncomeStream with Spanned {
   /// this year\'s figure and growth compounds from [currentYear]. Compounding
   /// from year zero instead would leave every existing salary flat forever.
   Money resolvedAmount(int year, {required int currentYear}) {
-    if (!activeIn(year)) return 0;
-    final grown = grossAnnualAmount *
+    if (!activeIn(year)) return Money.zero;
+    final growth =
         math.pow(1 + realGrowthRate, year - (startYear ?? currentYear));
-    return grown * activeFraction(year);
+    return grossAnnualAmount * (growth * activeFraction(year));
   }
 }

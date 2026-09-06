@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 IncomeStream job({
   required String id,
-  required Money pay,
+  required num pay,
   int? startYear,
   int? endYear,
   int? startMonth,
@@ -15,7 +15,7 @@ IncomeStream job({
       personId: 'p1',
       label: id,
       kind: IncomeKind.w2Wages,
-      grossAnnualAmount: pay,
+      grossAnnualAmount: Money.dollars(pay),
       realGrowthRate: growth,
       startYear: startYear,
       endYear: endYear,
@@ -86,13 +86,14 @@ void main() {
     test('the transition year carries the pay actually received', () {
       final total = leaving.resolvedAmount(2030, currentYear: 2030) +
           starting.resolvedAmount(2030, currentYear: 2030);
-      expect(total, closeTo(150000 * 7 / 12 + 170000 * 5 / 12, 1e-9));
-      expect(total, lessThan(150000 + 170000));
+      expect(total.dollars, closeTo(150000 * 7 / 12 + 170000 * 5 / 12, 0.01));
+      expect(total.dollars, lessThan(150000 + 170000));
     });
 
     test('the year after carries the new salary alone', () {
-      expect(leaving.resolvedAmount(2031, currentYear: 2030), 0);
-      expect(starting.resolvedAmount(2031, currentYear: 2030), 170000);
+      expect(leaving.resolvedAmount(2031, currentYear: 2030), Money.zero);
+      expect(starting.resolvedAmount(2031, currentYear: 2030),
+          Money.dollars(170000));
     });
   });
 
@@ -105,18 +106,18 @@ void main() {
         startYear: 2030,
         startMonth: 7,
       );
-      expect(s.resolvedAmount(2030, currentYear: 2030),
-          closeTo(100000 * 6 / 12, 1e-9));
-      expect(s.resolvedAmount(2032, currentYear: 2030),
-          closeTo(100000 * 1.02 * 1.02, 1e-9));
+      expect(s.resolvedAmount(2030, currentYear: 2030).dollars,
+          closeTo(100000 * 6 / 12, 0.01));
+      expect(s.resolvedAmount(2032, currentYear: 2030).dollars,
+          closeTo(100000 * 1.02 * 1.02, 0.01));
     });
 
     test('a stream already running compounds from the current year', () {
       // Null startYear means the entered figure is this year's salary. Growing
       // from year zero instead would leave every existing salary flat.
       final s = job(id: 'a', pay: 100000, growth: 0.02);
-      expect(s.resolvedAmount(2030, currentYear: 2030), 100000);
-      expect(s.resolvedAmount(2031, currentYear: 2030), closeTo(102000, 1e-9));
+      expect(s.resolvedAmount(2030, currentYear: 2030), Money.dollars(100000));
+      expect(s.resolvedAmount(2031, currentYear: 2030), Money.dollars(102000));
     });
   });
 }

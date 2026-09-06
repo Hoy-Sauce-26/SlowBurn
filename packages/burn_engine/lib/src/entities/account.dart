@@ -29,30 +29,30 @@ class EmployerMatch {
   /// Zero compensation yields zero match, which is the right answer for an
   /// account no employer sponsors.
   Money matchOn(Money employeeContribution, Money employerComp) {
-    if (employerComp <= 0) return 0;
-    final employeePct = employeeContribution / employerComp;
+    if (!employerComp.isPositive) return Money.zero;
+    final employeePct = employeeContribution.ratioTo(employerComp);
     switch (formula) {
       case MatchFormula.percentOfContribution:
-        return matchRate *
-            math.min(
+        return minMoney(
               employeeContribution,
-              matchLimitPercentOfSalary * employerComp,
-            );
+              employerComp * matchLimitPercentOfSalary,
+            ) *
+            matchRate;
       case MatchFormula.percentOfSalary:
         // A limit of zero makes this a non-elective contribution, owed whether
         // or not the employee defers anything.
         return employeePct >= matchLimitPercentOfSalary
-            ? matchRate * employerComp
-            : 0;
+            ? employerComp * matchRate
+            : Money.zero;
       case MatchFormula.tiered:
-        var total = 0.0;
+        var total = Money.zero;
         var previousCeiling = 0.0;
         for (final tier in tiers) {
           final slice = math.max(
             0.0,
             math.min(employeePct, tier.upToPercentOfSalary) - previousCeiling,
           );
-          total += tier.matchRate * employerComp * slice;
+          total += employerComp * (tier.matchRate * slice);
           previousCeiling = tier.upToPercentOfSalary;
         }
         return total;
@@ -107,10 +107,11 @@ class Contribution with Spanned {
   /// A `percentOfGross` contribution needs no proration of its own: [base] is
   /// already the streams' resolved amounts, which carry the partial year.
   Money uncappedAmount(int year, {required Money base}) {
-    if (!activeIn(year)) return 0;
+    if (!activeIn(year)) return Money.zero;
     return switch (mode) {
-      ContributionMode.fixedAmount => value * activeFraction(year),
-      ContributionMode.percentOfGross => value * base,
+      ContributionMode.fixedAmount =>
+        Money(value.round()) * activeFraction(year),
+      ContributionMode.percentOfGross => base * value,
     };
   }
 }
@@ -164,8 +165,8 @@ class Account {
     required this.taxTreatment,
     required this.limitFamily,
     required this.balance,
-    this.costBasis = 0,
-    this.rothContributionBasis = 0,
+    this.costBasis = Money.zero,
+    this.rothContributionBasis = Money.zero,
     this.rothFirstContributionYear,
     required this.contribution,
     this.employerId,

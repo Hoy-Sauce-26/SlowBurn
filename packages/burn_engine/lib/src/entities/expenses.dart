@@ -92,13 +92,12 @@ class ExpenseItem with Spanned {
     required int? retirementYear,
     required Rate categoryDefaultInflation,
   }) {
-    if (!appliesIn(year, retirementYear: retirementYear)) return 0;
+    if (!appliesIn(year, retirementYear: retirementYear)) return Money.zero;
     final rate = relativeInflationRate ?? categoryDefaultInflation;
     final retired = retirementYear != null && year >= retirementYear;
     final base =
         retired && postRetirementAmount != null ? postRetirementAmount! : amount;
-    return base *
-        math.pow(1 + rate, year - currentYear) *
-        activeFraction(year);
+    final inflation = math.pow(1 + rate, year - currentYear);
+    return base * (inflation * activeFraction(year));
   }
 }

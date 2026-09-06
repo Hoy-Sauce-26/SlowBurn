@@ -22,11 +22,12 @@ class Indexed {
   const Indexed.fixed(this.value) : indexed = false;
 
   /// This threshold in real terms for a projected year (§7.4).
-  Money realValueIn(int year, {required int currentYear, required Rate inflation}) {
+  Money realValueIn(int year,
+      {required int currentYear, required Rate inflation}) {
     if (indexed) return value;
     var deflated = value;
     for (var y = currentYear; y < year; y++) {
-      deflated /= (1 + inflation);
+      deflated = deflated / (1 + inflation);
     }
     return deflated;
   }
@@ -48,7 +49,7 @@ class PhaseOut {
   /// How far into the phase-out [magi] sits, clamped to [0, 1].
   double fractionAt(Money magi) {
     if (upper <= lower) return magi >= upper ? 1 : 0;
-    final raw = (magi - lower) / (upper - lower);
+    final raw = (magi - lower).ratioTo(upper - lower);
     return raw < 0 ? 0 : (raw > 1 ? 1 : raw);
   }
 }
@@ -91,7 +92,7 @@ class ContributionLimit {
     for (final tier in catchUpTiers) {
       if (tier.coversAge(age)) return tier.amount;
     }
-    return 0;
+    return Money.zero;
   }
 }
 
@@ -160,10 +161,10 @@ class JurisdictionRules {
     required this.code,
     this.brackets = const [],
     this.flatRate,
-    this.standardDeduction = 0,
-    this.personalExemption = 0,
+    this.standardDeduction = Money.zero,
+    this.personalExemption = Money.zero,
     this.conformsToPreTaxDeferrals = true,
-    this.retirementIncomeExclusion = 0,
+    this.retirementIncomeExclusion = Money.zero,
   });
 
   bool get leviesNoIncomeTax => brackets.isEmpty && (flatRate ?? 0) == 0;
@@ -326,6 +327,6 @@ class TaxYear {
     if (table.containsKey(size)) return table[size]!;
     final sizes = table.keys.toList()..sort();
     final largest = sizes.last;
-    return table[largest]! + (size - largest) * federalPovertyLevelIncrement;
+    return table[largest]! + federalPovertyLevelIncrement * (size - largest);
   }
 }

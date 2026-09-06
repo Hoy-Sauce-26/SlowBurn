@@ -1,0 +1,1110 @@
+{
+ "id": "us-2026",
+ "year": 2026,
+ "_provenance": "PROVISIONAL. Statutory figures (marked indexed:false) are fixed by law and stable. Inflation-adjusted figures are estimates and must be checked against the IRS revenue procedure for 2026 before release. See README.md.",
+ "federalBrackets": {
+  "single": [
+   {
+    "upTo": 1192500,
+    "rate": 0.1
+   },
+   {
+    "upTo": 4847500,
+    "rate": 0.12
+   },
+   {
+    "upTo": 10335000,
+    "rate": 0.22
+   },
+   {
+    "upTo": 19730000,
+    "rate": 0.24
+   },
+   {
+    "upTo": 25052500,
+    "rate": 0.32
+   },
+   {
+    "upTo": 62635000,
+    "rate": 0.35
+   },
+   {
+    "upTo": null,
+    "rate": 0.37
+   }
+  ],
+  "marriedFilingJointly": [
+   {
+    "upTo": 2385000,
+    "rate": 0.1
+   },
+   {
+    "upTo": 9695000,
+    "rate": 0.12
+   },
+   {
+    "upTo": 20670000,
+    "rate": 0.22
+   },
+   {
+    "upTo": 39460000,
+    "rate": 0.24
+   },
+   {
+    "upTo": 50105000,
+    "rate": 0.32
+   },
+   {
+    "upTo": 75160000,
+    "rate": 0.35
+   },
+   {
+    "upTo": null,
+    "rate": 0.37
+   }
+  ],
+  "marriedFilingSeparately": [
+   {
+    "upTo": 1192500,
+    "rate": 0.1
+   },
+   {
+    "upTo": 4847500,
+    "rate": 0.12
+   },
+   {
+    "upTo": 10335000,
+    "rate": 0.22
+   },
+   {
+    "upTo": 19730000,
+    "rate": 0.24
+   },
+   {
+    "upTo": 25052500,
+    "rate": 0.32
+   },
+   {
+    "upTo": 37580000,
+    "rate": 0.35
+   },
+   {
+    "upTo": null,
+    "rate": 0.37
+   }
+  ],
+  "headOfHousehold": [
+   {
+    "upTo": 1700000,
+    "rate": 0.1
+   },
+   {
+    "upTo": 6485000,
+    "rate": 0.12
+   },
+   {
+    "upTo": 10335000,
+    "rate": 0.22
+   },
+   {
+    "upTo": 19730000,
+    "rate": 0.24
+   },
+   {
+    "upTo": 25050000,
+    "rate": 0.32
+   },
+   {
+    "upTo": 62635000,
+    "rate": 0.35
+   },
+   {
+    "upTo": null,
+    "rate": 0.37
+   }
+  ],
+  "qualifyingSurvivingSpouse": [
+   {
+    "upTo": 2385000,
+    "rate": 0.1
+   },
+   {
+    "upTo": 9695000,
+    "rate": 0.12
+   },
+   {
+    "upTo": 20670000,
+    "rate": 0.22
+   },
+   {
+    "upTo": 39460000,
+    "rate": 0.24
+   },
+   {
+    "upTo": 50105000,
+    "rate": 0.32
+   },
+   {
+    "upTo": 75160000,
+    "rate": 0.35
+   },
+   {
+    "upTo": null,
+    "rate": 0.37
+   }
+  ]
+ },
+ "federalLtcgBrackets": {
+  "single": [
+   {
+    "upTo": 4835000,
+    "rate": 0.0
+   },
+   {
+    "upTo": 53340000,
+    "rate": 0.15
+   },
+   {
+    "upTo": null,
+    "rate": 0.2
+   }
+  ],
+  "marriedFilingJointly": [
+   {
+    "upTo": 9670000,
+    "rate": 0.0
+   },
+   {
+    "upTo": 60005000,
+    "rate": 0.15
+   },
+   {
+    "upTo": null,
+    "rate": 0.2
+   }
+  ],
+  "marriedFilingSeparately": [
+   {
+    "upTo": 4835000,
+    "rate": 0.0
+   },
+   {
+    "upTo": 30000000,
+    "rate": 0.15
+   },
+   {
+    "upTo": null,
+    "rate": 0.2
+   }
+  ],
+  "headOfHousehold": [
+   {
+    "upTo": 6475000,
+    "rate": 0.0
+   },
+   {
+    "upTo": 56670000,
+    "rate": 0.15
+   },
+   {
+    "upTo": null,
+    "rate": 0.2
+   }
+  ],
+  "qualifyingSurvivingSpouse": [
+   {
+    "upTo": 9670000,
+    "rate": 0.0
+   },
+   {
+    "upTo": 60005000,
+    "rate": 0.15
+   },
+   {
+    "upTo": null,
+    "rate": 0.2
+   }
+  ]
+ },
+ "standardDeduction": {
+  "single": {
+   "value": 1575000,
+   "indexed": true
+  },
+  "marriedFilingJointly": {
+   "value": 3150000,
+   "indexed": true
+  },
+  "marriedFilingSeparately": {
+   "value": 1575000,
+   "indexed": true
+  },
+  "headOfHousehold": {
+   "value": 2362500,
+   "indexed": true
+  },
+  "qualifyingSurvivingSpouse": {
+   "value": 3150000,
+   "indexed": true
+  }
+ },
+ "additionalStandardDeductionAge65": {
+  "value": 200000,
+  "indexed": true
+ },
+ "qbiDeductionRate": 0.2,
+ "qbiThreshold": {
+  "single": {
+   "value": 19730000,
+   "indexed": true
+  },
+  "marriedFilingJointly": {
+   "value": 39460000,
+   "indexed": true
+  },
+  "marriedFilingSeparately": {
+   "value": 19730000,
+   "indexed": true
+  },
+  "headOfHousehold": {
+   "value": 19730000,
+   "indexed": true
+  },
+  "qualifyingSurvivingSpouse": {
+   "value": 39460000,
+   "indexed": true
+  }
+ },
+ "studentLoanInterestCap": {
+  "value": 250000,
+  "indexed": false
+ },
+ "studentLoanInterestPhaseOut": {
+  "single": {
+   "lower": 8500000,
+   "upper": 10000000
+  },
+  "marriedFilingJointly": {
+   "lower": 17000000,
+   "upper": 20000000
+  },
+  "marriedFilingSeparately": {
+   "lower": 0,
+   "upper": 0
+  },
+  "headOfHousehold": {
+   "lower": 8500000,
+   "upper": 10000000
+  },
+  "qualifyingSurvivingSpouse": {
+   "lower": 17000000,
+   "upper": 20000000
+  }
+ },
+ "socialSecurityWageBase": 18450000,
+ "oasdiRate": 0.062,
+ "medicareRate": 0.0145,
+ "seNetEarningsFactor": 0.9235,
+ "additionalMedicareRate": 0.009,
+ "additionalMedicareThreshold": {
+  "single": {
+   "value": 20000000,
+   "indexed": false
+  },
+  "marriedFilingJointly": {
+   "value": 25000000,
+   "indexed": false
+  },
+  "marriedFilingSeparately": {
+   "value": 12500000,
+   "indexed": false
+  },
+  "headOfHousehold": {
+   "value": 20000000,
+   "indexed": false
+  },
+  "qualifyingSurvivingSpouse": {
+   "value": 25000000,
+   "indexed": false
+  }
+ },
+ "niitThreshold": {
+  "single": {
+   "value": 20000000,
+   "indexed": false
+  },
+  "marriedFilingJointly": {
+   "value": 25000000,
+   "indexed": false
+  },
+  "marriedFilingSeparately": {
+   "value": 12500000,
+   "indexed": false
+  },
+  "headOfHousehold": {
+   "value": 20000000,
+   "indexed": false
+  },
+  "qualifyingSurvivingSpouse": {
+   "value": 25000000,
+   "indexed": false
+  }
+ },
+ "niitRate": 0.038,
+ "socialSecurityTaxabilityThresholds": {
+  "single": {
+   "lower": 2500000,
+   "upper": 3400000
+  },
+  "marriedFilingJointly": {
+   "lower": 3200000,
+   "upper": 4400000
+  },
+  "marriedFilingSeparately": {
+   "lower": 0,
+   "upper": 0
+  },
+  "headOfHousehold": {
+   "lower": 2500000,
+   "upper": 3400000
+  },
+  "qualifyingSurvivingSpouse": {
+   "lower": 3200000,
+   "upper": 4400000
+  }
+ },
+ "socialSecurityTaxableFractions": {
+  "half": 0.5,
+  "cap": 0.85
+ },
+ "socialSecurityFraByBirthYear": {
+  "1943": 792,
+  "1944": 792,
+  "1945": 792,
+  "1946": 792,
+  "1947": 792,
+  "1948": 792,
+  "1949": 792,
+  "1950": 792,
+  "1951": 792,
+  "1952": 792,
+  "1953": 792,
+  "1954": 792,
+  "1955": 792,
+  "1956": 794,
+  "1957": 796,
+  "1958": 798,
+  "1959": 800,
+  "1960": 804,
+  "1961": 804,
+  "1962": 804,
+  "1963": 804,
+  "1964": 804,
+  "1965": 804,
+  "1966": 804,
+  "1967": 804,
+  "1968": 804,
+  "1969": 804,
+  "1970": 804,
+  "1971": 804,
+  "1972": 804,
+  "1973": 804,
+  "1974": 804,
+  "1975": 804,
+  "1976": 804,
+  "1977": 804,
+  "1978": 804,
+  "1979": 804,
+  "1980": 804,
+  "1981": 804,
+  "1982": 804,
+  "1983": 804,
+  "1984": 804,
+  "1985": 804,
+  "1986": 804,
+  "1987": 804,
+  "1988": 804,
+  "1989": 804,
+  "1990": 804,
+  "1991": 804,
+  "1992": 804,
+  "1993": 804,
+  "1994": 804,
+  "1995": 804,
+  "1996": 804,
+  "1997": 804,
+  "1998": 804,
+  "1999": 804,
+  "2000": 804,
+  "2001": 804,
+  "2002": 804,
+  "2003": 804,
+  "2004": 804,
+  "2005": 804,
+  "2006": 804,
+  "2007": 804,
+  "2008": 804,
+  "2009": 804,
+  "2010": 804
+ },
+ "claimingAdjustment": {
+  "earlyFirstMonths": 36,
+  "earlyRate": 0.005555555555555556,
+  "earlyRateBeyond": 0.004166666666666667,
+  "delayedRate": 0.006666666666666667
+ },
+ "contributionLimits": {
+  "electiveDeferral": {
+   "annual": 2450000,
+   "catchUpTiers": [
+    {
+     "fromAge": 50,
+     "toAge": 59,
+     "amount": 800000
+    },
+    {
+     "fromAge": 60,
+     "toAge": 63,
+     "amount": 1125000
+    },
+    {
+     "fromAge": 64,
+     "toAge": null,
+     "amount": 800000
+    }
+   ]
+  },
+  "simpleDeferral": {
+   "annual": 1700000,
+   "catchUpTiers": [
+    {
+     "fromAge": 50,
+     "toAge": null,
+     "amount": 400000
+    }
+   ]
+  },
+  "ira": {
+   "annual": 750000,
+   "catchUpTiers": [
+    {
+     "fromAge": 50,
+     "toAge": null,
+     "amount": 110000
+    }
+   ]
+  },
+  "sep": {
+   "rate": 0.25
+  },
+  "hsa": {
+   "selfOnly": 440000,
+   "family": 875000,
+   "catchUpTiers": [
+    {
+     "fromAge": 55,
+     "toAge": null,
+     "amount": 100000
+    }
+   ]
+  },
+  "education": {},
+  "none": {}
+ },
+ "rothCatchUpWageThreshold": 15000000,
+ "annualAdditions415c": 7200000,
+ "compensationLimit401a17": 36000000,
+ "rothIraIncomeLimit": {
+  "single": {
+   "lower": 15000000,
+   "upper": 16500000
+  },
+  "marriedFilingJointly": {
+   "lower": 23600000,
+   "upper": 24600000
+  },
+  "marriedFilingSeparately": {
+   "lower": 0,
+   "upper": 1000000
+  },
+  "headOfHousehold": {
+   "lower": 15000000,
+   "upper": 16500000
+  },
+  "qualifyingSurvivingSpouse": {
+   "lower": 23600000,
+   "upper": 24600000
+  }
+ },
+ "iraDeductibilityPhaseOut": {
+  "single": {
+   "covered": {
+    "lower": 7900000,
+    "upper": 8900000
+   },
+   "spouseCoveredOnly": {
+    "lower": 7900000,
+    "upper": 8900000
+   }
+  },
+  "marriedFilingJointly": {
+   "covered": {
+    "lower": 12600000,
+    "upper": 14600000
+   },
+   "spouseCoveredOnly": {
+    "lower": 23600000,
+    "upper": 24600000
+   }
+  },
+  "marriedFilingSeparately": {
+   "covered": {
+    "lower": 0,
+    "upper": 1000000
+   },
+   "spouseCoveredOnly": {
+    "lower": 0,
+    "upper": 1000000
+   }
+  },
+  "headOfHousehold": {
+   "covered": {
+    "lower": 7900000,
+    "upper": 8900000
+   },
+   "spouseCoveredOnly": {
+    "lower": 7900000,
+    "upper": 8900000
+   }
+  },
+  "qualifyingSurvivingSpouse": {
+   "covered": {
+    "lower": 12600000,
+    "upper": 14600000
+   },
+   "spouseCoveredOnly": {
+    "lower": 23600000,
+    "upper": 24600000
+   }
+  }
+ },
+ "earlyWithdrawalPenaltyRate": 0.1,
+ "hsaNonMedicalPenaltyRate": 0.2,
+ "rmdAgeByBirthYear": {
+  "1951": 73,
+  "1952": 73,
+  "1953": 73,
+  "1954": 73,
+  "1955": 73,
+  "1956": 73,
+  "1957": 73,
+  "1958": 73,
+  "1959": 73,
+  "1960": 75,
+  "1961": 75,
+  "1962": 75,
+  "1963": 75,
+  "1964": 75,
+  "1965": 75,
+  "1966": 75,
+  "1967": 75,
+  "1968": 75,
+  "1969": 75,
+  "1970": 75,
+  "1971": 75,
+  "1972": 75,
+  "1973": 75,
+  "1974": 75,
+  "1975": 75,
+  "1976": 75,
+  "1977": 75,
+  "1978": 75,
+  "1979": 75,
+  "1980": 75,
+  "1981": 75,
+  "1982": 75,
+  "1983": 75,
+  "1984": 75,
+  "1985": 75,
+  "1986": 75,
+  "1987": 75,
+  "1988": 75,
+  "1989": 75,
+  "1990": 75,
+  "1991": 75,
+  "1992": 75,
+  "1993": 75,
+  "1994": 75,
+  "1995": 75,
+  "1996": 75,
+  "1997": 75,
+  "1998": 75,
+  "1999": 75,
+  "2000": 75,
+  "2001": 75,
+  "2002": 75,
+  "2003": 75,
+  "2004": 75,
+  "2005": 75,
+  "2006": 75,
+  "2007": 75,
+  "2008": 75,
+  "2009": 75,
+  "2010": 75
+ },
+ "rmdDivisorTable": {
+  "72": 27.4,
+  "73": 26.5,
+  "74": 25.5,
+  "75": 24.6,
+  "76": 23.7,
+  "77": 22.9,
+  "78": 22.0,
+  "79": 21.1,
+  "80": 20.2,
+  "81": 19.4,
+  "82": 18.5,
+  "83": 17.7,
+  "84": 16.8,
+  "85": 16.0,
+  "86": 15.2,
+  "87": 14.4,
+  "88": 13.7,
+  "89": 12.9,
+  "90": 12.2,
+  "91": 11.5,
+  "92": 10.8,
+  "93": 10.1,
+  "94": 9.5,
+  "95": 8.9,
+  "96": 8.4,
+  "97": 7.8,
+  "98": 7.3,
+  "99": 6.8,
+  "100": 6.4,
+  "101": 6.0,
+  "102": 5.6,
+  "103": 5.2,
+  "104": 4.9,
+  "105": 4.6,
+  "106": 4.3,
+  "107": 4.1,
+  "108": 3.9,
+  "109": 3.7,
+  "110": 3.5,
+  "111": 3.4,
+  "112": 3.3,
+  "113": 3.1,
+  "114": 3.0,
+  "115": 2.9,
+  "116": 2.8,
+  "117": 2.7,
+  "118": 2.5,
+  "119": 2.3,
+  "120": 2.0
+ },
+ "childTaxCreditPerChild": 220000,
+ "childTaxCreditPhaseOutThreshold": {
+  "single": {
+   "value": 20000000,
+   "indexed": false
+  },
+  "marriedFilingJointly": {
+   "value": 40000000,
+   "indexed": false
+  },
+  "marriedFilingSeparately": {
+   "value": 20000000,
+   "indexed": false
+  },
+  "headOfHousehold": {
+   "value": 20000000,
+   "indexed": false
+  },
+  "qualifyingSurvivingSpouse": {
+   "value": 40000000,
+   "indexed": false
+  }
+ },
+ "childTaxCreditPhaseOutPerThousand": 5000,
+ "childTaxCreditPhaseOutStep": 100000,
+ "childTaxCreditQualifyingAge": 17,
+ "childTaxCreditRefundablePerChild": 170000,
+ "childTaxCreditRefundableRate": 0.15,
+ "childTaxCreditRefundableEarnedIncomeFloor": {
+  "value": 250000,
+  "indexed": false
+ },
+ "federalPovertyLevel": {
+  "US": {
+   "1": 1565000,
+   "2": 2115000,
+   "3": 2665000,
+   "4": 3215000,
+   "5": 3765000,
+   "6": 4315000,
+   "7": 4865000,
+   "8": 5415000
+  },
+  "AK": {
+   "1": 1955000,
+   "2": 2642000,
+   "3": 3329000,
+   "4": 4016000,
+   "5": 4703000,
+   "6": 5390000,
+   "7": 6077000,
+   "8": 6764000
+  },
+  "HI": {
+   "1": 1799000,
+   "2": 2431000,
+   "3": 3063000,
+   "4": 3695000,
+   "5": 4327000,
+   "6": 4959000,
+   "7": 5591000,
+   "8": 6223000
+  }
+ },
+ "federalPovertyLevelIncrement": 550000,
+ "acaApplicablePercentageTable": [
+  {
+   "fplPercent": 100,
+   "applicablePercent": 0.0
+  },
+  {
+   "fplPercent": 150,
+   "applicablePercent": 0.0
+  },
+  {
+   "fplPercent": 200,
+   "applicablePercent": 0.02
+  },
+  {
+   "fplPercent": 250,
+   "applicablePercent": 0.04
+  },
+  {
+   "fplPercent": 300,
+   "applicablePercent": 0.06
+  },
+  {
+   "fplPercent": 400,
+   "applicablePercent": 0.085
+  }
+ ],
+ "acaMinimumFplPercent": 100,
+ "acaMaximumFplPercent": null,
+ "acaBenchmarkPremiumByAge": {
+  "21": 450000,
+  "22": 465800,
+  "23": 482100,
+  "24": 498900,
+  "25": 516400,
+  "26": 534500,
+  "27": 553200,
+  "28": 572500,
+  "29": 592600,
+  "30": 613300,
+  "31": 634800,
+  "32": 657000,
+  "33": 680000,
+  "34": 703800,
+  "35": 728400,
+  "36": 753900,
+  "37": 780300,
+  "38": 807600,
+  "39": 835900,
+  "40": 865100,
+  "41": 895400,
+  "42": 926700,
+  "43": 959200,
+  "44": 992800,
+  "45": 1027500,
+  "46": 1063500,
+  "47": 1100700,
+  "48": 1139200,
+  "49": 1179100,
+  "50": 1220300,
+  "51": 1263100,
+  "52": 1307300,
+  "53": 1353000,
+  "54": 1400400,
+  "55": 1449400,
+  "56": 1500100,
+  "57": 1552600,
+  "58": 1607000,
+  "59": 1663200,
+  "60": 1721400,
+  "61": 1781700,
+  "62": 1844000,
+  "63": 1908600,
+  "64": 1975400
+ },
+ "irmaaBrackets": {
+  "single": [
+   {
+    "magiThreshold": 0,
+    "partBPremium": 18500,
+    "partDSurcharge": 0
+   },
+   {
+    "magiThreshold": 10900000,
+    "partBPremium": 25900,
+    "partDSurcharge": 1370
+   },
+   {
+    "magiThreshold": 13700000,
+    "partBPremium": 37000,
+    "partDSurcharge": 3530
+   },
+   {
+    "magiThreshold": 17100000,
+    "partBPremium": 48090,
+    "partDSurcharge": 5700
+   },
+   {
+    "magiThreshold": 20500000,
+    "partBPremium": 59190,
+    "partDSurcharge": 7860
+   },
+   {
+    "magiThreshold": 50000000,
+    "partBPremium": 62890,
+    "partDSurcharge": 8580
+   }
+  ],
+  "marriedFilingJointly": [
+   {
+    "magiThreshold": 0,
+    "partBPremium": 18500,
+    "partDSurcharge": 0
+   },
+   {
+    "magiThreshold": 10900000,
+    "partBPremium": 25900,
+    "partDSurcharge": 1370
+   },
+   {
+    "magiThreshold": 13700000,
+    "partBPremium": 37000,
+    "partDSurcharge": 3530
+   },
+   {
+    "magiThreshold": 17100000,
+    "partBPremium": 48090,
+    "partDSurcharge": 5700
+   },
+   {
+    "magiThreshold": 20500000,
+    "partBPremium": 59190,
+    "partDSurcharge": 7860
+   },
+   {
+    "magiThreshold": 50000000,
+    "partBPremium": 62890,
+    "partDSurcharge": 8580
+   }
+  ],
+  "marriedFilingSeparately": [
+   {
+    "magiThreshold": 0,
+    "partBPremium": 18500,
+    "partDSurcharge": 0
+   },
+   {
+    "magiThreshold": 10900000,
+    "partBPremium": 25900,
+    "partDSurcharge": 1370
+   },
+   {
+    "magiThreshold": 13700000,
+    "partBPremium": 37000,
+    "partDSurcharge": 3530
+   },
+   {
+    "magiThreshold": 17100000,
+    "partBPremium": 48090,
+    "partDSurcharge": 5700
+   },
+   {
+    "magiThreshold": 20500000,
+    "partBPremium": 59190,
+    "partDSurcharge": 7860
+   },
+   {
+    "magiThreshold": 50000000,
+    "partBPremium": 62890,
+    "partDSurcharge": 8580
+   }
+  ],
+  "headOfHousehold": [
+   {
+    "magiThreshold": 0,
+    "partBPremium": 18500,
+    "partDSurcharge": 0
+   },
+   {
+    "magiThreshold": 10900000,
+    "partBPremium": 25900,
+    "partDSurcharge": 1370
+   },
+   {
+    "magiThreshold": 13700000,
+    "partBPremium": 37000,
+    "partDSurcharge": 3530
+   },
+   {
+    "magiThreshold": 17100000,
+    "partBPremium": 48090,
+    "partDSurcharge": 5700
+   },
+   {
+    "magiThreshold": 20500000,
+    "partBPremium": 59190,
+    "partDSurcharge": 7860
+   },
+   {
+    "magiThreshold": 50000000,
+    "partBPremium": 62890,
+    "partDSurcharge": 8580
+   }
+  ],
+  "qualifyingSurvivingSpouse": [
+   {
+    "magiThreshold": 0,
+    "partBPremium": 18500,
+    "partDSurcharge": 0
+   },
+   {
+    "magiThreshold": 10900000,
+    "partBPremium": 25900,
+    "partDSurcharge": 1370
+   },
+   {
+    "magiThreshold": 13700000,
+    "partBPremium": 37000,
+    "partDSurcharge": 3530
+   },
+   {
+    "magiThreshold": 17100000,
+    "partBPremium": 48090,
+    "partDSurcharge": 5700
+   },
+   {
+    "magiThreshold": 20500000,
+    "partBPremium": 59190,
+    "partDSurcharge": 7860
+   },
+   {
+    "magiThreshold": 50000000,
+    "partBPremium": 62890,
+    "partDSurcharge": 8580
+   }
+  ]
+ },
+ "section121Exclusion": {
+  "single": {
+   "value": 25000000,
+   "indexed": false
+  },
+  "marriedFilingJointly": {
+   "value": 50000000,
+   "indexed": false
+  },
+  "marriedFilingSeparately": {
+   "value": 25000000,
+   "indexed": false
+  },
+  "headOfHousehold": {
+   "value": 25000000,
+   "indexed": false
+  },
+  "qualifyingSurvivingSpouse": {
+   "value": 50000000,
+   "indexed": false
+  }
+ },
+ "unrecapturedSection1250Rate": 0.25,
+ "residentialDepreciationYears": 27.5,
+ "stateRules": {
+  "TX": {
+   "brackets": []
+  },
+  "FL": {
+   "brackets": []
+  },
+  "WA": {
+   "brackets": []
+  },
+  "NV": {
+   "brackets": []
+  },
+  "TN": {
+   "brackets": []
+  },
+  "WY": {
+   "brackets": []
+  },
+  "SD": {
+   "brackets": []
+  },
+  "AK": {
+   "brackets": []
+  },
+  "NH": {
+   "brackets": []
+  },
+  "CO": {
+   "flatRate": 0.044,
+   "standardDeduction": 1575000
+  },
+  "PA": {
+   "flatRate": 0.0307,
+   "conformsToPreTaxDeferrals": false
+  },
+  "CA": {
+   "brackets": [
+    {
+     "upTo": 1075600,
+     "rate": 0.01
+    },
+    {
+     "upTo": 2549900,
+     "rate": 0.02
+    },
+    {
+     "upTo": 4024500,
+     "rate": 0.04
+    },
+    {
+     "upTo": 5586600,
+     "rate": 0.06
+    },
+    {
+     "upTo": 7060600,
+     "rate": 0.08
+    },
+    {
+     "upTo": 36065900,
+     "rate": 0.093
+    },
+    {
+     "upTo": 43278700,
+     "rate": 0.103
+    },
+    {
+     "upTo": 72131400,
+     "rate": 0.113
+    },
+    {
+     "upTo": null,
+     "rate": 0.123
+    }
+   ],
+   "standardDeduction": 554000
+  }
+ },
+ "localRules": {}
+}

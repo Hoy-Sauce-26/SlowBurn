@@ -39,5 +39,5 @@ class OneTimeEvent {
     this.taxTreatment = EventTaxTreatment.nonTaxable,
   });
 
-  bool get isOutflow => amount < 0;
+  bool get isOutflow => amount.isNegative;
 }

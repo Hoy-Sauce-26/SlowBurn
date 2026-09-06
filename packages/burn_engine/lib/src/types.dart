@@ -6,7 +6,54 @@
 /// always a decimal (0.05, never 5) per invariant 9.
 library;
 
-typedef Money = double;
+/// Money, in **integer cents** (invariant 10).
+///
+/// A zero-cost wrapper over `int`, so the invariant is carried by the type
+/// rather than by everyone remembering it. Forty years of compounding a balance
+/// as a float drifts; rounding to the cent at every store does not.
+///
+/// Arithmetic that genuinely is fractional — growth, proration, a fixed point —
+/// goes through [dollars] and comes back through [Money.dollars]. Rounding is
+/// therefore explicit and happens once per store, which is the only place it
+/// can be reasoned about.
+extension type const Money(int cents) {
+  static const zero = Money(0);
+
+  factory Money.dollars(num amount) => Money((amount * 100).round());
+
+  double get dollars => cents / 100;
+
+  bool get isZero => cents == 0;
+  bool get isNegative => cents < 0;
+  bool get isPositive => cents > 0;
+
+  Money operator +(Money other) => Money(cents + other.cents);
+  Money operator -(Money other) => Money(cents - other.cents);
+  Money operator -() => Money(-cents);
+
+  /// Scaling by a rate or a fraction. Rounds to the nearest cent.
+  Money operator *(num factor) => Money((cents * factor).round());
+  Money operator /(num divisor) => Money((cents / divisor).round());
+
+  bool operator <(Money other) => cents < other.cents;
+  bool operator <=(Money other) => cents <= other.cents;
+  bool operator >(Money other) => cents > other.cents;
+  bool operator >=(Money other) => cents >= other.cents;
+
+  /// The ratio of two amounts, which is a rate rather than an amount.
+  double ratioTo(Money other) => other.cents == 0 ? 0 : cents / other.cents;
+
+  Money get orZeroIfNegative => cents < 0 ? Money.zero : this;
+}
+
+Money minMoney(Money a, Money b) => a.cents <= b.cents ? a : b;
+Money maxMoney(Money a, Money b) => a.cents >= b.cents ? a : b;
+
+/// Sums an iterable of amounts. `fold` with [Money.zero] everywhere reads worse
+/// than naming the operation once.
+Money sumMoney(Iterable<Money> amounts) =>
+    amounts.fold(Money.zero, (a, b) => a + b);
+
 typedef Rate = double;
 typedef Id = String;
 
