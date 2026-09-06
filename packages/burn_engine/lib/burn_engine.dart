@@ -27,6 +27,8 @@ export 'src/loop/projection.dart';
 export 'src/loop/waterfall.dart';
 export 'src/loop/withdrawals.dart';
 export 'src/pipeline/allocation.dart';
+export 'src/serde/json.dart';
+export 'src/serde/snapshot.dart';
 export 'src/solve/bridge.dart';
 export 'src/solve/embedded_rates.dart';
 export 'src/solve/fire_number.dart';
