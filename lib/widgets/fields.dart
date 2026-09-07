@@ -13,9 +13,100 @@ final _money = NumberFormat.currency(symbol: r'$', decimalDigits: 2);
 final _compact = NumberFormat.compactCurrency(symbol: r'$', decimalDigits: 1);
 
 String formatMoney(Money m) => _money.format(m.dollars);
+
 String formatMoneyCompact(Money m) => _compact.format(m.dollars);
+
 String formatPercent(Rate r) =>
     '${(r * 100).toStringAsFixed(r * 100 % 1 == 0 ? 0 : 2)}%';
+
+/// A text field that selects what is in it when you click into it, so typing
+/// replaces the value rather than landing somewhere inside it.
+///
+/// Every typed field in the app goes through this. They are all the same
+/// shape, and the alternative is four widgets that each forget the behaviour
+/// separately. `initialValue` is not enough on its own: selecting text needs a
+/// controller, and a controller needs somebody to keep it in step with a value
+/// the screen changes underneath it.
+class _TypedField extends StatefulWidget {
+  final String label;
+  final String? helper;
+  final String text;
+  final ValueChanged<String> onChanged;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter> formatters;
+  final String? prefix;
+  final String? suffix;
+
+  const _TypedField({
+    required this.label,
+    required this.text,
+    required this.onChanged,
+    this.helper,
+    this.keyboardType,
+    this.formatters = const [],
+    this.prefix,
+    this.suffix,
+  });
+
+  @override
+  State<_TypedField> createState() => _TypedFieldState();
+}
+
+class _TypedFieldState extends State<_TypedField> {
+  late final _controller = TextEditingController(text: widget.text);
+  final _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_selectAll);
+  }
+
+  @override
+  void didUpdateWidget(_TypedField old) {
+    super.didUpdateWidget(old);
+    // A value the screen changed while somebody was typing into it would fight
+    // them, so this only follows along when the field is not in use.
+    if (widget.text != old.text &&
+        !_focus.hasFocus &&
+        _controller.text != widget.text) {
+      _controller.text = widget.text;
+    }
+  }
+
+  @override
+  void dispose() {
+    _focus.removeListener(_selectAll);
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _selectAll() {
+    if (!_focus.hasFocus) return;
+    _controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _controller.text.length,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => TextFormField(
+    controller: _controller,
+    focusNode: _focus,
+    decoration: InputDecoration(
+      labelText: widget.label,
+      helperText: widget.helper,
+      helperMaxLines: 6,
+      prefixText: widget.prefix,
+      suffixText: widget.suffix,
+      border: const OutlineInputBorder(),
+    ),
+    keyboardType: widget.keyboardType,
+    inputFormatters: widget.formatters,
+    onChanged: widget.onChanged,
+  );
+}
 
 class MoneyField extends StatelessWidget {
   final String label;
@@ -34,31 +125,29 @@ class MoneyField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      initialValue: initial == null || initial!.isZero
-          ? ''
-          : initial!.dollars.toStringAsFixed(2),
-      decoration: InputDecoration(
-        labelText: label,
-        helperText: helper,
-        prefixText: r'$ ',
-        border: const OutlineInputBorder(),
+  Widget build(BuildContext context) => _TypedField(
+    label: label,
+    helper: helper,
+    prefix: r'$ ',
+    text: initial == null || initial!.isZero
+        ? ''
+        : initial!.dollars.toStringAsFixed(2),
+    keyboardType: TextInputType.numberWithOptions(
+      decimal: true,
+      signed: allowNegative,
+    ),
+    formatters: [
+      FilteringTextInputFormatter.allow(
+        RegExp(allowNegative ? r'^-?\d*\.?\d{0,2}' : r'^\d*\.?\d{0,2}'),
       ),
-      keyboardType:
-          TextInputType.numberWithOptions(decimal: true, signed: allowNegative),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(
-            RegExp(allowNegative ? r'^-?\d*\.?\d{0,2}' : r'^\d*\.?\d{0,2}')),
-      ],
-      onChanged: (text) {
-        final value = double.tryParse(text);
-        // An empty field means zero rather than "unchanged": a user clearing a
-        // number is saying it is not there.
-        onChanged(value == null ? Money.zero : Money.dollars(value));
-      },
-    );
-  }
+    ],
+    onChanged: (text) {
+      final value = double.tryParse(text);
+      // An empty field means zero rather than "unchanged": a user clearing
+      // a number is saying it is not there.
+      onChanged(value == null ? Money.zero : Money.dollars(value));
+    },
+  );
 }
 
 class PercentField extends StatelessWidget {
@@ -76,28 +165,27 @@ class PercentField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      // Two things go wrong with the obvious `(rate * 100).toString()`. A
-      // round rate renders a trailing zero, 0.04 becoming "4.0", and an
-      // unrepresentable one renders its error: 0.0145 becomes
-      // "1.4500000000000002". Neither is a field anyone wants to edit.
-      initialValue:
-          initial == null || initial == 0 ? '' : _percentText(initial! * 100),
-      decoration: InputDecoration(
-        labelText: label,
-        helperText: helper,
-        suffixText: '%',
-        border: const OutlineInputBorder(),
-      ),
-      keyboardType: const TextInputType.numberWithOptions(
-          decimal: true, signed: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^-?\d*\.?\d{0,3}')),
-      ],
-      onChanged: (text) => onChanged((double.tryParse(text) ?? 0) / 100),
-    );
-  }
+  Widget build(BuildContext context) => _TypedField(
+    label: label,
+    helper: helper,
+    suffix: '%',
+    // Two things go wrong with the obvious `(rate * 100).toString()`. A
+    // round rate renders a trailing zero, 0.04 becoming "4.0", and an
+    // unrepresentable one renders its error: 0.0145 becomes
+    // "1.4500000000000002". Neither is a field anyone wants to edit.
+    // Zero is an answer, and a rate that says "keeps pace with inflation
+    // and no more" must not read as a field nobody filled in. Only null
+    // renders empty.
+    text: initial == null ? '' : _percentText(initial! * 100),
+    keyboardType: const TextInputType.numberWithOptions(
+      decimal: true,
+      signed: true,
+    ),
+    formatters: [
+      FilteringTextInputFormatter.allow(RegExp(r'^-?\d*\.?\d{0,3}')),
+    ],
+    onChanged: (text) => onChanged((double.tryParse(text) ?? 0) / 100),
+  );
 }
 
 String _percentText(double value) {
@@ -120,14 +208,8 @@ class LabelledTextField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => TextFormField(
-        initialValue: initial,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-        onChanged: onChanged,
-      );
+  Widget build(BuildContext context) =>
+      _TypedField(label: label, text: initial ?? '', onChanged: onChanged);
 }
 
 /// A whole year, nullable. Null carries meaning throughout the domain: a null
@@ -147,18 +229,14 @@ class YearField extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => TextFormField(
-        initialValue: initial?.toString(),
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: helper,
-          helperMaxLines: 3,
-          border: const OutlineInputBorder(),
-        ),
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        onChanged: (text) => onChanged(int.tryParse(text)),
-      );
+  Widget build(BuildContext context) => _TypedField(
+    label: label,
+    helper: helper,
+    text: initial?.toString() ?? '',
+    keyboardType: TextInputType.number,
+    formatters: [FilteringTextInputFormatter.digitsOnly],
+    onChanged: (text) => onChanged(int.tryParse(text)),
+  );
 }
 
 /// A dropdown you can type into on a desktop and only tap on a phone.
@@ -227,7 +305,9 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
       // Arriving with an answer already in the box, the next letter typed
       // should start a new search rather than land after "Colorado".
       _controller.selection = TextSelection(
-          baseOffset: 0, extentOffset: _controller.text.length);
+        baseOffset: 0,
+        extentOffset: _controller.text.length,
+      );
       return;
     }
     final settled = _shownFor(widget.value);
@@ -238,9 +318,9 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
       value == null ? widget.noneLabel ?? '' : widget.describe(value);
 
   List<String> get _entryLabels => [
-        if (widget.noneLabel != null) widget.noneLabel!,
-        for (final v in widget.values) widget.describe(v),
-      ];
+    if (widget.noneLabel != null) widget.noneLabel!,
+    for (final v in widget.values) widget.describe(v),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +345,7 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
         inputFormatters: [_KeepsToTheList(() => _entryLabels)],
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
-          helperMaxLines: 3,
+          helperMaxLines: 6,
         ),
         dropdownMenuEntries: entries,
         onSelected: (v) {
@@ -298,11 +378,14 @@ class _SearchableFieldState<T> extends State<SearchableField<T>> {
 /// not on the list.
 class _KeepsToTheList extends TextInputFormatter {
   _KeepsToTheList(this.labels);
+
   final List<String> Function() labels;
 
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue before, TextEditingValue after) {
+    TextEditingValue before,
+    TextEditingValue after,
+  ) {
     if (after.text.isEmpty) return after;
     final typed = after.text.toLowerCase();
     final matches = labels().any((l) => l.toLowerCase().contains(typed));
@@ -360,28 +443,77 @@ class NumberChoiceField extends StatelessWidget {
 /// launch. Territories are excluded: Puerto Rico in particular runs a code that
 /// is a separate system rather than a state-style layer on the federal one.
 const usStateCodes = <String, String>{
-  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas',
-  'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
-  'DC': 'District of Columbia', 'FL': 'Florida', 'GA': 'Georgia',
-  'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana',
-  'IA': 'Iowa', 'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana',
-  'ME': 'Maine', 'MD': 'Maryland', 'MA': 'Massachusetts', 'MI': 'Michigan',
-  'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri', 'MT': 'Montana',
-  'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire',
-  'NJ': 'New Jersey', 'NM': 'New Mexico', 'NY': 'New York',
-  'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
-  'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania',
-  'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota',
-  'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
-  'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia',
-  'WI': 'Wisconsin', 'WY': 'Wyoming',
+  'AL': 'Alabama',
+  'AK': 'Alaska',
+  'AZ': 'Arizona',
+  'AR': 'Arkansas',
+  'CA': 'California',
+  'CO': 'Colorado',
+  'CT': 'Connecticut',
+  'DE': 'Delaware',
+  'DC': 'District of Columbia',
+  'FL': 'Florida',
+  'GA': 'Georgia',
+  'HI': 'Hawaii',
+  'ID': 'Idaho',
+  'IL': 'Illinois',
+  'IN': 'Indiana',
+  'IA': 'Iowa',
+  'KS': 'Kansas',
+  'KY': 'Kentucky',
+  'LA': 'Louisiana',
+  'ME': 'Maine',
+  'MD': 'Maryland',
+  'MA': 'Massachusetts',
+  'MI': 'Michigan',
+  'MN': 'Minnesota',
+  'MS': 'Mississippi',
+  'MO': 'Missouri',
+  'MT': 'Montana',
+  'NE': 'Nebraska',
+  'NV': 'Nevada',
+  'NH': 'New Hampshire',
+  'NJ': 'New Jersey',
+  'NM': 'New Mexico',
+  'NY': 'New York',
+  'NC': 'North Carolina',
+  'ND': 'North Dakota',
+  'OH': 'Ohio',
+  'OK': 'Oklahoma',
+  'OR': 'Oregon',
+  'PA': 'Pennsylvania',
+  'RI': 'Rhode Island',
+  'SC': 'South Carolina',
+  'SD': 'South Dakota',
+  'TN': 'Tennessee',
+  'TX': 'Texas',
+  'UT': 'Utah',
+  'VT': 'Vermont',
+  'VA': 'Virginia',
+  'WA': 'Washington',
+  'WV': 'West Virginia',
+  'WI': 'Wisconsin',
+  'WY': 'Wyoming',
 };
 
 const monthNames = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
+/// A dropdown over an enum. Filtering is the reason this goes through
+/// [SearchableField] rather than a plain `DropdownButtonFormField`: fifteen
+/// account kinds is a list worth typing at.
 class EnumField<T extends Enum> extends StatelessWidget {
   final String label;
   final String? helper;
@@ -401,30 +533,14 @@ class EnumField<T extends Enum> extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => DropdownButtonFormField<T>(
-        initialValue: value,
-        // Without this the selected label sizes the field, and
-        // "Qualifying surviving spouse" overflows a column that fits
-        // "Single" comfortably.
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: helper,
-          helperMaxLines: 3,
-          border: const OutlineInputBorder(),
-        ),
-        items: [
-          for (final v in values)
-            DropdownMenuItem(
-              value: v,
-              child: Text(
-                describe?.call(v) ?? humanise(v.name),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-        ],
-        onChanged: (v) => v == null ? null : onChanged(v),
-      );
+  Widget build(BuildContext context) => SearchableField<T>(
+    label: label,
+    helper: helper,
+    values: values,
+    value: value,
+    describe: (v) => describe?.call(v) ?? humanise(v.name),
+    onChanged: (v) => v == null ? null : onChanged(v),
+  );
 }
 
 /// A dropdown over anything, for the cases that are not an enum: which person
@@ -449,34 +565,101 @@ class ChoiceField<T> extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => DropdownButtonFormField<T>(
-        initialValue: value,
-        // Without this the selected label sizes the field, and
-        // "Qualifying surviving spouse" overflows a column that fits
-        // "Single" comfortably.
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: label,
-          helperText: helper,
-          helperMaxLines: 3,
-          border: const OutlineInputBorder(),
-        ),
-        items: [
-          for (final v in values)
-            DropdownMenuItem(
-              value: v,
-              child: Text(describe(v), overflow: TextOverflow.ellipsis),
-            ),
-        ],
-        onChanged: (v) => v == null ? null : onChanged(v),
-      );
+  Widget build(BuildContext context) => SearchableField<T>(
+    label: label,
+    helper: helper,
+    values: values,
+    value: value,
+    describe: describe,
+    onChanged: (v) => v == null ? null : onChanged(v),
+  );
 }
 
 /// `marriedFilingJointly` reads as "Married filing jointly". Engine vocabulary
 /// is precise and camelCase; a form label should be neither.
+/// What people call these, which `humanise` cannot get to from an enum name:
+/// it would turn `traditional401k` into "Traditional401k" and `traditionalTsp`
+/// into "Traditional tsp".
+String accountKindName(AccountKind kind) => switch (kind) {
+  AccountKind.traditional401k => '401(k)',
+  AccountKind.roth401k => 'Roth 401(k)',
+  AccountKind.traditional403b => '403(b)',
+  AccountKind.roth403b => 'Roth 403(b)',
+  AccountKind.traditionalTsp => 'TSP',
+  AccountKind.rothTsp => 'Roth TSP',
+  AccountKind.traditionalIra => 'Traditional IRA',
+  AccountKind.rothIra => 'Roth IRA',
+  AccountKind.hsa => 'HSA',
+  AccountKind.sepIra => 'SEP IRA',
+  AccountKind.simpleIra => 'SIMPLE IRA',
+  AccountKind.education529 => '529',
+  AccountKind.taxableBrokerage => 'Brokerage',
+  AccountKind.cashSavings => 'Savings',
+  AccountKind.cashChecking => 'Checking',
+};
+
+/// A name nobody typed, kept distinct from the ones already in use. Two old
+/// 401(k)s and two credit cards are both ordinary, and "Credit card" twice
+/// helps nobody.
+String uniqueLabel(String base, Iterable<String> taken) {
+  final used = taken.toSet();
+  if (!used.contains(base)) return base;
+  for (var n = 2; ; n++) {
+    if (!used.contains('$base $n')) return '$base $n';
+  }
+}
+
+/// What a class is called on screen. `humanise` gets "Us stocks" from
+/// `usStocks`, which nobody would write.
+String assetClassName(AssetClass c) => switch (c.label) {
+  AssetClassLabel.usStocks => 'US stocks',
+  AssetClassLabel.intlStocks => 'International stocks',
+  AssetClassLabel.bonds => 'Bonds',
+  AssetClassLabel.reit => 'Property funds',
+  AssetClassLabel.savings => 'Savings interest',
+  AssetClassLabel.cash => 'Cash, earning nothing',
+  AssetClassLabel.crypto => 'Crypto',
+};
+
+/// What a spending category is called on screen. Two of them need saying
+/// carefully, since the difference between a roof and the bills that come with
+/// one is the difference between a plan that houses somebody and one that only
+/// thinks it does.
+String metaCategoryName(MetaCategory c) => switch (c) {
+  MetaCategory.housing => 'Rent or lodging',
+  MetaCategory.housingSupport => 'Housing costs',
+  MetaCategory.transportation => 'Transport',
+  MetaCategory.food => 'Food',
+  MetaCategory.health => 'Health',
+  MetaCategory.childcare => 'Childcare',
+  MetaCategory.discretionary => 'Discretionary',
+  MetaCategory.insurance => 'Insurance',
+  MetaCategory.education => 'Education',
+  MetaCategory.misc => 'Everything else',
+};
+
+/// The line under it, where one is needed to tell two apart.
+String? metaCategoryBlurb(MetaCategory c) => switch (c) {
+  MetaCategory.housing =>
+    'What you pay to have somewhere to live. This is the one that answers '
+        'whether you are housed.',
+  MetaCategory.housingSupport =>
+    'utilities, internet, property tax outside escrow, HOA dues, contents '
+        'insurance, upkeep, etc.',
+  MetaCategory.health =>
+    'Health spending is what an HSA can be spent on '
+        'without tax, so it is worth its own line.',
+  MetaCategory.education =>
+    'Education spending is what a 529 pays for, and draws one down as it '
+        'goes.',
+  _ => null,
+};
+
 String humanise(String camel) {
   final spaced = camel.replaceAllMapped(
-      RegExp(r'([a-z0-9])([A-Z])'), (m) => '${m[1]} ${m[2]}');
+    RegExp(r'([a-z0-9])([A-Z])'),
+    (m) => '${m[1]} ${m[2]}',
+  );
   return spaced[0].toUpperCase() + spaced.substring(1).toLowerCase();
 }
 
@@ -484,35 +667,64 @@ String humanise(String camel) {
 /// in a phone column and a desktop pane.
 class FieldRow extends StatelessWidget {
   final List<Widget> children;
+
   const FieldRow(this.children, {super.key});
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 420;
-          if (narrow) {
-            return Column(
-              children: [
-                for (final child in children)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: child,
-                  ),
-              ],
-            );
-          }
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 12),
-                  Expanded(child: children[i]),
-                ],
-              ],
-            ),
-          );
-        },
+    builder: (context, constraints) {
+      final narrow = constraints.maxWidth < 420;
+      if (narrow) {
+        return Column(
+          children: [
+            for (final child in children)
+              Padding(padding: const EdgeInsets.only(bottom: 12), child: child),
+          ],
+        );
+      }
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) const SizedBox(width: 12),
+              Expanded(child: children[i]),
+            ],
+          ],
+        ),
       );
+    },
+  );
+}
+
+/// A short aside, for the things a form label has no room to say.
+class Note extends StatelessWidget {
+  final String text;
+
+  const Note(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.info_outline,
+          size: 16,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

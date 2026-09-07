@@ -2,7 +2,7 @@
 ///
 /// §3.4 stores `taxTreatment` and `limitFamily` alongside `kind` rather than
 /// deriving them at read time, so a custom account can set them. These are the
-/// defaults a new account starts from, and invariant 29 is what stops the
+/// defaults a new account starts from, and invariant 28 is what stops the
 /// stored pair from becoming nonsense.
 library;
 

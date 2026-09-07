@@ -85,7 +85,7 @@ Projection project(
   Rate? effectiveRetirementTaxRate,
 }) {
   final currentYear = asOfDate.year;
-  final horizon = _horizon(household, assumptions, currentYear);
+  final horizon = horizonYear(household, assumptions, currentYear);
 
   final accounts = {
     for (final a in household.accounts) a.id: AccountState(a),
@@ -286,12 +286,17 @@ Projection project(
       if (c.limitExceeded) flags.add('contributionLimitExceeded');
     }
 
+    // From the retirement year on, an account holds whatever it was going to
+    // be moved into. A portfolio that carries somebody to retirement is rarely
+    // the one they live off afterwards (§3.9).
+    final retired = retirementYear != null && year >= retirementYear;
+
     // Distributions are taxed this year and stay in the account, so they raise
     // basis without moving the balance (§4.3.1, §6.3). Without this the same
     // dollars would be taxed again as gains on the way out.
     for (final state in accounts.values.where((a) => a.isTaxable)) {
-      state.creditInvestmentIncome(
-          state.balance * blendedIncomeYield(state.account, assetClasses));
+      state.creditInvestmentIncome(state.balance *
+          blendedIncomeYield(state.account, assetClasses, retired: retired));
     }
 
     final earnedIncome = {
@@ -402,7 +407,11 @@ Projection project(
 
     // Growth, then amortisation, then the measures.
     for (final state in accounts.values) {
-      state.grow(assetClasses: assetClasses, band: band, frac: frac);
+      state.grow(
+          assetClasses: assetClasses,
+          band: band,
+          frac: frac,
+          retired: retired);
     }
     for (final debt in liabilities.values) {
       debt.advanceYear(
@@ -442,6 +451,7 @@ Projection project(
       liabilities: liabilities,
       asOfDate: asOfDate,
       year: year,
+      retirementYear: retirementYear,
     ));
     flags.addAll(doubleCountFlags(household));
     if (retirementYear != null &&
@@ -505,7 +515,7 @@ Money _projectedSurplus(
   return (pay * 0.70 - expenses).orZeroIfNegative;
 }
 
-int _horizon(Household household, Assumptions assumptions, int currentYear) {
+int horizonYear(Household household, Assumptions assumptions, int currentYear) {
   if (household.people.isEmpty) return currentYear;
   final youngest = household.people
       .map((p) => p.birthDate.year)

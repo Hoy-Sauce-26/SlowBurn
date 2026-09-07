@@ -5,7 +5,8 @@ import '../services/persistence.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/results_panel.dart';
 import 'accounts_screen.dart';
-import 'debts_screen.dart';
+import 'housing_screen.dart';
+import 'property_screen.dart';
 import 'household_screen.dart';
 import 'income_screen.dart';
 import 'plan_screen.dart';
@@ -24,7 +25,10 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
-  int _selected = 0;
+  /// Opens on Plan, which is where the answer lives once there is one and the
+  /// list of what is still missing until then. Landing on a form asks somebody
+  /// to fill it in without saying why.
+  int _selected = _planIndex;
 
   @override
   void initState() {
@@ -80,10 +84,18 @@ class _HomeShellState extends ConsumerState<HomeShell>
       build: () => const SpendingScreen(),
     ),
     Destination(
-      label: 'Debts',
-      icon: Icons.credit_card_outlined,
-      selectedIcon: Icons.credit_card,
-      build: () => const DebtsScreen(),
+      label: 'Housing',
+      icon: Icons.holiday_village_outlined,
+      selectedIcon: Icons.holiday_village,
+      build: () => const HousingScreen(),
+    ),
+    Destination(
+      // Assets live here too, and a page called Debts that holds the house is
+      // the kind of label somebody trusts once.
+      label: 'Property',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home,
+      build: () => const PropertyScreen(),
     ),
     Destination(
       label: 'Plan',
@@ -92,6 +104,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
       build: () => const PlanScreen(),
     ),
   ];
+
+  static int get _planIndex =>
+      _destinations.indexWhere((d) => d.label == 'Plan');
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +135,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
           destinations: destinations,
           selectedIndex: index,
           onSelect: (i) => setState(() => _selected = i),
-          results: const ResultsPanel(),
+          // The Plan screen carries the checklist itself while a plan is being
+          // built, so the panel beside it does not say the same thing twice.
+          results: ResultsPanel(showsSetup: index != _planIndex),
         );
       },
     );

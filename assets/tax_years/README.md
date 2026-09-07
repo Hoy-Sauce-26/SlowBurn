@@ -7,77 +7,70 @@ new tax year is a data change, so a new year is a new file here and no code.
 Money is **integer cents** throughout, per invariant 10. A fractional cent is
 refused by the loader rather than rounded.
 
-## 2026.json is provisional
+## What is in 2026.json
 
-The figures split in two, and only one half is safe.
+Every figure is tax year 2026, from the primary sources:
 
-**Statutory and stable.** Anything carrying `"indexed": false` is fixed by law
-and has not moved in years: the NIIT and additional-Medicare thresholds
-($200k/$250k), the §86 Social Security provisional-income thresholds
-($25k/$34k, $32k/$44k), the §121 exclusion ($250k/$500k), the Child Tax Credit
-phase-out thresholds, and the student-loan interest cap. Likewise the rates:
-OASDI 6.2%, Medicare 1.45%, additional Medicare 0.9%, NIIT 3.8%, the §199A 20%,
-the 10% early-withdrawal and 20% HSA non-medical penalties, unrecaptured §1250
-at 25%, and 27.5-year residential depreciation.
+| | |
+|---|---|
+| brackets, deductions, capital gains, §199A, the credits | Rev. Proc. 2025-32 |
+| deferral, IRA, 415(c), 401(a)(17) and catch-up limits | Notice 2025-67 |
+| HSA limits | Rev. Proc. 2025-19 |
+| the premium tax credit table | Rev. Proc. 2025-25 |
+| the poverty guidelines | HHS, January 2026 |
+| Part B premiums and IRMAA tiers | CMS |
+| the wage base | SSA |
+| state brackets and deductions | Tax Foundation, 2026 |
 
-**Estimated, and needing verification before release.** Every
-inflation-adjusted figure. Check each against the IRS revenue procedure for
-2026 and the SSA fact sheet:
+All of it read on 6 September 2026.
 
-- `federalBrackets`, `federalLtcgBrackets`, `standardDeduction`
-- `socialSecurityWageBase`
-- `contributionLimits` for every family, and every `catchUpTiers` amount
-- `annualAdditions415c`, `compensationLimit401a17`, `rothCatchUpWageThreshold`
-- `rothIraIncomeLimit`, `iraDeductibilityPhaseOut`, `qbiThreshold`
-- `childTaxCreditPerChild` and `childTaxCreditRefundablePerChild`
-- `federalPovertyLevel` and its increment, from the HHS guidelines
-- `acaBenchmarkPremiumByAge`, currently a smooth curve standing in for the
-  national average, and `acaApplicablePercentageTable`
-- `irmaaBrackets`, and note they are currently the same for every filing status
-- `rmdAgeByBirthYear` and `rmdDivisorTable`
-- the federal half of this file is still on 2025 figures, one year behind
-  `stateRules` below. Refreshing it is the next data job.
+Anything carrying `"indexed": false` is fixed by law rather than adjusted: the
+NIIT and additional-Medicare thresholds ($200k/$250k), the §86 Social Security
+provisional-income thresholds ($25k/$34k, $32k/$44k), the §121 exclusion
+($250k/$500k), the Child Tax Credit phase-out thresholds, and the student-loan
+interest cap. Likewise the rates: OASDI 6.2%, Medicare 1.45%, additional
+Medicare 0.9%, NIIT 3.8%, the §199A 20%, the 10% early-withdrawal and 20% HSA
+non-medical penalties, unrecaptured §1250 at 25%, and 27.5-year residential
+depreciation. §7.4 asks that those be deflated each projected year rather than
+carried forward at face value.
 
-Until that check happens, treat any number the app shows as directionally right
-and precisely wrong. §7.5's staleness posture applies: the app should say which
-ruleset produced a figure.
+### What 2026 changed
+
+The **enhanced premium tax credits expired** with 2025.
+`acaApplicablePercentageTable` is back on the statutory schedule, where the
+poorest household contributes 2.10% of income rather than nothing and the
+top band pays 9.96%, and `acaMaximumFplPercent` is 400 again, so a household
+a dollar over four times the poverty line receives nothing at all. For a
+bridge plan this is the most consequential number in the file.
+
+The **deduction for people 65 and over** that the 2025 act added is in
+`seniorDeduction`, worth $6,000 a head. It carries `throughYear: 2028`,
+which is what stops a long projection spending it in the 2030s. A tax year
+that grants none leaves the field out.
 
 ## The state layer
 
-`stateRules` covers all fifty states and the District of Columbia, taken from
-the Tax Foundation's *2026 State Individual Income Tax Rates and Brackets*,
-read on 6 September 2026. Nine states levy no broad income tax and carry an
-empty schedule.
+`stateRules` covers all fifty states and the District of Columbia, from the
+Tax Foundation's *2026 State Individual Income Tax Rates and Brackets*. Nine
+states levy no broad income tax and carry an empty schedule. Rates,
+deductions, exemptions and credits are split by filing status: each figure
+is written either as one value for everybody, or as a `single` and `married`
+pair, and filing separately and heads of household follow the single
+schedule.
 
-Rates and brackets are split by filing status. A jurisdiction figure is written
-either as one value for everybody, or as a `single` and `married` pair, and
-filing separately and heads of household follow the single schedule. That is
-what most states do, and it is the conservative reading where they do not:
-several states give a head of household a wider schedule than a single filer,
-so those households are shown slightly more state tax than they will owe.
+Connecticut's joint schedule was reconstructed by doubling its single
+brackets, because the source table skipped a rate.
 
-What the model does not yet carry, in rough order of how much it costs a
-household:
+`retirementIncomeExclusion` is zero for every state, which understates what
+retirees in about thirty of them keep. Tracked in
+[backlog.md](../../docs/backlog.md).
 
-- **Retirement income exclusions.** Illinois, Pennsylvania and Mississippi
-  exempt retirement income almost entirely, and around thirty states exclude
-  part of it, usually with an age or income test. `retirementIncomeExclusion`
-  exists but is subtracted from all income rather than from retirement income,
-  so it is left at zero everywhere until it can be applied to the right
-  dollars. Retirees in those states are shown more state tax than they owe.
-- **Social Security.** Most states exempt it and the state layer runs off
-  federal AGI, which includes whatever part of it is federally taxable.
-- **Credits.** Arizona, Arkansas, California, Delaware, Iowa, Nebraska, Oregon
-  and Utah give a personal credit rather than an exemption, and the model has
-  only exemptions. Those credits are dropped, which overstates their tax a
-  little.
-- **Phase-outs.** Connecticut, Rhode Island and others taper the personal
-  exemption away as income rises, and Wisconsin tapers its standard deduction.
-  Both are carried flat here, which understates tax at high incomes.
-- **Washington's capital gains tax**, 7% above a large exclusion, has no home in
-  a model whose state layer runs on ordinary income. Washington is carried as a
-  no-income-tax state, which is right for wages and wrong for a large sale.
-- **Connecticut's joint schedule** was reconstructed by doubling its single
-  brackets, because the source table skipped a rate.
-- **Local income tax.** `localRules` is still empty, and New York City, Maryland
-  counties and Ohio municipalities all levy their own.
+## Still estimated
+
+`acaBenchmarkPremiumByAge` is a smooth curve standing in for a national
+average, and 2026 premiums rose steeply. Anyone modelling a bridge to
+Medicare should enter their own benchmark rather than trust it. Tracked in
+[backlog.md](../../docs/backlog.md).
+
+What the model deliberately leaves out is listed in §13.2 of
+[domain.md](../../docs/domain.md), not here.

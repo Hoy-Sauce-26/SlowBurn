@@ -22,6 +22,7 @@ export 'src/entities/spanned.dart';
 export 'src/loop/account_state.dart';
 export 'src/loop/amortization.dart';
 export 'src/loop/flags.dart';
+export 'src/loop/housing.dart';
 export 'src/loop/measures.dart';
 export 'src/loop/projection.dart';
 export 'src/loop/waterfall.dart';

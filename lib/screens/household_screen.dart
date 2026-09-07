@@ -26,17 +26,17 @@ class HouseholdScreen extends ConsumerWidget {
       addLabel: 'Add a person',
       emptyMessage: 'Start with yourself.',
       banner: const FlagBanner(home: FlagHome.household),
-      onAdd: () => _editPerson(context, ref, null),
+      onAdd: () => editPerson(context, ref, null),
       children: [
         for (final person in household.people)
           EntityTile(
             icon: Icons.person_outline,
             title: person.displayName,
             subtitle: _describe(person),
-            onTap: () => _editPerson(context, ref, person),
+            onTap: () => editPerson(context, ref, person),
             onDelete: () => notifier.removePerson(person.id),
           ),
-        for (final unit in household.taxUnits) _TaxUnitCard(unit: unit),
+        for (final unit in household.taxUnits) TaxUnitCard(unit: unit),
       ],
     );
   }
@@ -54,7 +54,7 @@ class HouseholdScreen extends ConsumerWidget {
     return parts.join(' · ');
   }
 
-  Future<void> _editPerson(
+  Future<void> editPerson(
     BuildContext context,
     WidgetRef ref,
     Person? existing,
@@ -163,7 +163,7 @@ class HouseholdScreen extends ConsumerWidget {
                   ),
               ]),
               if (plannedAge == null)
-                _Note(
+                Note(
                   'Once you set a retirement age we will also ask when your '
                   'health coverage through work ends, since buying your own is '
                   'usually the largest cost of retiring early.',
@@ -194,7 +194,7 @@ class HouseholdScreen extends ConsumerWidget {
                 onChanged: (v) => setState(() => hasBenefit = v),
               ),
               if (hasBenefit) ...[
-                _Note(
+                Note(
                   'Your Social Security statement at ssa.gov shows a monthly '
                   'benefit at your full retirement age. Enter that figure, '
                   'and we will adjust it for the age you actually claim.',
@@ -293,44 +293,11 @@ class _Section extends StatelessWidget {
   );
 }
 
-class _Note extends StatelessWidget {
-  final String text;
-
-  const _Note(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 16,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// The return itself, under the people who file it.
-class _TaxUnitCard extends ConsumerWidget {
+class TaxUnitCard extends ConsumerWidget {
   final TaxUnit unit;
 
-  const _TaxUnitCard({required this.unit});
+  const TaxUnitCard({super.key, required this.unit});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -344,13 +311,17 @@ class _TaxUnitCard extends ConsumerWidget {
           data: (y) => y.stateRules.containsKey(unit.stateCode),
           orElse: () => true,
         );
-    TaxUnit edited({FilingStatus? status, String? state}) => TaxUnit(
+    TaxUnit edited({
+      FilingStatus? status,
+      String? state,
+      List<Dependent>? dependents,
+    }) => TaxUnit(
       id: unit.id,
       householdId: unit.householdId,
       filingStatus: status ?? unit.filingStatus,
       stateCode: state ?? unit.stateCode,
       localityCode: unit.localityCode,
-      dependents: unit.dependents,
+      dependents: dependents ?? unit.dependents,
       benchmarkPremiumOverride: unit.benchmarkPremiumOverride,
       itemizedDeductionTotal: unit.itemizedDeductionTotal,
     );
@@ -382,6 +353,116 @@ class _TaxUnitCard extends ConsumerWidget {
                 onChanged: (code) => notifier.saveTaxUnit(edited(state: code)),
               ),
             ]),
+            // Children are not people in the plan: they earn nothing and hold
+            // nothing. What they do is bring a credit and count toward the
+            // household size every subsidy is measured against (§3.2).
+            EntitySection(
+              title: 'Children and dependants',
+              blurb: 'Each one brings a tax credit while they qualify, and '
+                  'counts toward the household size behind any health '
+                  'subsidy.',
+              addLabel: 'Add a dependant',
+              emptyMessage: 'Nobody depending on this return.',
+              onAdd: () => _editDependent(context, ref, null),
+              children: [
+                for (final (index, dependent) in unit.dependents.indexed)
+                  EntityTile(
+                    icon: Icons.child_care_outlined,
+                    title: 'Born ${dependent.birthDate.year}',
+                    subtitle: 'supported through '
+                        '${dependent.resolvedSupportEndYear}'
+                        '${dependent.isStudent ? ' · student' : ''}',
+                    onTap: () => _editDependent(context, ref, index),
+                    onDelete: () => notifier.saveTaxUnit(edited(
+                        dependents: [...unit.dependents]..removeAt(index))),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Dependants are a list on the return rather than entities of their own, so
+  /// they are edited by position.
+  Future<void> _editDependent(
+      BuildContext context, WidgetRef ref, int? index) async {
+    final notifier = ref.read(householdProvider.notifier);
+    final existing = index == null ? null : unit.dependents[index];
+    final thisYear = DateTime.now().year;
+
+    var birthYear = existing?.birthDate.year ?? thisYear;
+    var isStudent = existing?.isStudent ?? false;
+    var supportEnd = existing?.supportEndYear;
+
+    await showEditor<void>(
+      context,
+      title: index == null ? 'Add a dependant' : 'Born $birthYear',
+      build: (context) => StatefulBuilder(
+        builder: (context, setState) => Column(
+          children: [
+            NumberChoiceField(
+              label: 'Born',
+              helper: 'The credit follows their age, and stops the year they '
+                  'turn 17.',
+              first: thisYear - 30,
+              last: thisYear,
+              descending: true,
+              value: birthYear,
+              onChanged: (v) => setState(() => birthYear = v ?? thisYear),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Still in full-time education'),
+              subtitle: const Text(
+                  'Support is assumed to run to 24 rather than 19.'),
+              value: isStudent,
+              onChanged: (v) => setState(() => isStudent = v),
+            ),
+            const SizedBox(height: 12),
+            NumberChoiceField(
+              label: 'You support them until',
+              helper: 'Left alone, this is the year they turn '
+                  '${isStudent ? 24 : 19}.',
+              first: thisYear,
+              last: thisYear + 40,
+              value: supportEnd,
+              noneLabel: 'Work it out for me',
+              onChanged: (v) => setState(() => supportEnd = v),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: () {
+                  final dependent = Dependent(
+                    birthDate: DateTime(birthYear, 6, 15),
+                    isStudent: isStudent,
+                    supportEndYear: supportEnd,
+                  );
+                  final all = [...unit.dependents];
+                  if (index == null) {
+                    all.add(dependent);
+                  } else {
+                    all[index] = dependent;
+                  }
+                  notifier.saveTaxUnit(TaxUnit(
+                    id: unit.id,
+                    householdId: unit.householdId,
+                    filingStatus: unit.filingStatus,
+                    stateCode: unit.stateCode,
+                    localityCode: unit.localityCode,
+                    dependents: all,
+                    benchmarkPremiumOverride: unit.benchmarkPremiumOverride,
+                    itemizedDeductionTotal: unit.itemizedDeductionTotal,
+                  ));
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Save'),
+              ),
+            ),
           ],
         ),
       ),

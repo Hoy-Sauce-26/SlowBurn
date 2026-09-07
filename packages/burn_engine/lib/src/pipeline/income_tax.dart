@@ -87,6 +87,7 @@ class TaxableIncome {
 
   final Money federalAgi;
   final Money deduction;
+  final Money seniorDeduction;
   final Money taxableBeforeQbi;
   final Money qbi;
   final Money qbiDeduction;
@@ -112,6 +113,7 @@ class TaxableIncome {
     required this.taxableSS,
     required this.federalAgi,
     required this.deduction,
+    required this.seniorDeduction,
     required this.taxableBeforeQbi,
     required this.qbi,
     required this.qbiDeduction,
@@ -131,8 +133,13 @@ TaxableIncome computeTaxableIncome(
   required List<PersonWages> wages,
   required int year,
   required int currentYear,
+
+  /// Null while §8.2 is still looking for one. What it changes here is which
+  /// allocation an account is throwing off income from (§3.9).
+  int? retirementYear,
   YearInputs inputs = const YearInputs(),
 }) {
+  final retired = retirementYear != null && year >= retirementYear;
   final people = household.peopleIn(unit).toList();
   final personIds = {for (final p in people) p.id};
   final unitWages =
@@ -171,12 +178,12 @@ TaxableIncome computeTaxableIncome(
           personIds.contains(a.personId) &&
           a.taxTreatment == TaxTreatment.taxable)
       .toList();
-  final inAccountInvestmentIncome = sumMoney(taxableAccounts
-      .map((a) => a.balance * blendedIncomeYield(a, assetClasses)));
+  final inAccountInvestmentIncome = sumMoney(taxableAccounts.map(
+      (a) => a.balance * blendedIncomeYield(a, assetClasses, retired: retired)));
   final qualifiedDividends = sumMoney(taxableAccounts.map((a) =>
       a.balance *
-      (blendedIncomeYield(a, assetClasses) *
-          blendedQualifiedIncomeFraction(a, assetClasses))));
+      (blendedIncomeYield(a, assetClasses, retired: retired) *
+          blendedQualifiedIncomeFraction(a, assetClasses, retired: retired))));
   final ordinaryInAccountIncome =
       inAccountInvestmentIncome - qualifiedDividends;
 
@@ -299,12 +306,25 @@ TaxableIncome computeTaxableIncome(
 
   final over65 = people.where((p) => p.ageIn(year) >= 65).length;
   final age65Additional =
-      threshold(taxYear.additionalStandardDeductionAge65) * over65;
+      threshold(taxYear.additionalStandardDeductionAge65[status]!) * over65;
   final standard = threshold(taxYear.standardDeduction[status]!);
   final deduction = maxMoney(
       standard + age65Additional, unit.itemizedDeductionTotal ?? Money.zero);
 
-  final taxableBeforeQbi = (federalAgi - deduction).orZeroIfNegative;
+  // The 2025 act's senior deduction sits outside that choice: it is allowed
+  // whether the unit itemizes or not, and it lapses after its final year.
+  final senior = taxYear.seniorDeduction;
+  final qualifyingSeniors = senior == null
+      ? 0
+      : people.where((p) => p.ageIn(year) >= senior.minAge).length;
+  final seniorDeduction = senior == null || year > senior.throughYear
+      ? Money.zero
+      : threshold(senior.amountPerPerson) *
+          (1 - senior.phaseOut[status]!.fractionAt(federalAgi)) *
+          qualifyingSeniors;
+
+  final taxableBeforeQbi =
+      (federalAgi - deduction - seniorDeduction).orZeroIfNegative;
 
   // §199A: pass-through business income, rental net of depreciation, less the
   // SE deduction and the pre-tax contributions funded from those streams.
@@ -342,6 +362,7 @@ TaxableIncome computeTaxableIncome(
     taxableSS: taxableSS,
     federalAgi: federalAgi,
     deduction: deduction,
+    seniorDeduction: seniorDeduction,
     taxableBeforeQbi: taxableBeforeQbi,
     qbi: qbi,
     qbiDeduction: qbiDeduction,
@@ -351,7 +372,7 @@ TaxableIncome computeTaxableIncome(
 
 /// Whether an unattributed entity reaches this unit: null resolves to the
 /// household's only tax unit, which exists only while there is one
-/// (invariant 25).
+/// (invariant 24).
 bool _reachesUnit(Id? personId, TaxUnit unit, Household household) {
   if (personId == null) return household.soleTaxUnit?.id == unit.id;
   return household.personById(personId)?.taxUnitId == unit.id;

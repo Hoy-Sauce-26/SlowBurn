@@ -57,6 +57,10 @@ Future<ProviderContainer> pumpApp(WidgetTester tester,
     child: MaterialApp(theme: lightTheme(), home: const HomeShell()),
   ));
   await tester.pump();
+  // The app opens on Plan, which is the checklist until a plan is declared
+  // ready. These tests are about the editors, so they start where the entities
+  // are.
+  await go(tester, 'Household');
   return container;
 }
 
@@ -164,7 +168,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(
-          find.widgetWithText(TextFormField, 'Label'), 'Truck');
+          find.widgetWithText(TextFormField, 'Name it (optional)'), 'Truck');
       await tester.enterText(
           find.widgetWithText(TextFormField, 'Amount'), '40000');
       await tester.tap(find.text('Save'));
@@ -174,7 +178,7 @@ void main() {
       expect(event.isOutflow, isTrue);
       expect(event.amount, Money.dollars(-40000));
       expect(event.accountId, 'a1',
-          reason: 'invariant 17: an outflow must name its source');
+          reason: 'invariant 16: an outflow must name its source');
       expect(validateHousehold(container.read(householdProvider)), isEmpty);
     });
 
@@ -222,11 +226,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // A 401(k) is the default kind, so the sponsor field is offered.
-      expect(find.text('Sponsored by'), findsOneWidget);
-      await tester.tap(find.text('No employer'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Acme').last);
-      await tester.pumpAndSettle();
+      expect(dropdown('Sponsored by'), findsWidgets);
+      await pick(tester, 'Sponsored by', 'Acme');
 
       expect(find.text('Employer matches contributions'), findsOneWidget,
           reason: 'a match needs an employer with pay behind it');
@@ -246,6 +247,97 @@ void main() {
       expect(account.contribution.employerMatch!.matchRate, 0.5);
     });
 
+    testWidgets('an old plan is not asked how much of a salary goes in',
+        (tester) async {
+      // A 401(k) from a job you left still grows and takes nothing in. Asking
+      // for a share of pay would be asking about pay nobody is receiving, so
+      // an account starts dormant and naming a job is what wakes it.
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Still paying into it'), findsOneWidget);
+      expect(dropdown('Put in'), findsNothing);
+      expect(find.widgetWithText(TextFormField, 'Each year'), findsNothing);
+      expect(dropdown('Last year you pay in'), findsNothing);
+
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Balance'), '120000');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final account = container.read(householdProvider).accounts.single;
+      expect(account.contribution.value, 0);
+      expect(account.contribution.endYear, isNull);
+    });
+
+    testWidgets('a share of pay is only offered where there is pay',
+        (tester) async {
+      final household = withPerson().copyWith(
+        employers: const [
+          Employer(id: 'emp', householdId: 'h1', label: 'Acme'),
+        ],
+      );
+      await pumpApp(tester, household: household);
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+
+      expect(dropdown('Put in'), findsNothing,
+          reason: 'no sponsor chosen yet, so a share of what?');
+      expect(find.widgetWithText(TextFormField, 'Each year'), findsNothing,
+          reason: 'a new account is dormant until a job is named');
+
+      await pick(tester, 'Sponsored by', 'Acme');
+      expect(dropdown('Put in'), findsWidgets,
+          reason: 'naming a current job says money is going in');
+
+      await pick(tester, 'Sponsored by', 'An old job, or none');
+      expect(dropdown('Put in'), findsNothing,
+          reason: 'taking the job away says the opposite');
+      expect(dropdown('Last year you pay in'), findsNothing);
+    });
+
+    testWidgets('an account names itself after the job it came with',
+        (tester) async {
+      final household = withPerson().copyWith(
+        employers: const [
+          Employer(id: 'emp', householdId: 'h1', label: 'Acme'),
+        ],
+      );
+      final container = await pumpApp(tester, household: household);
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+      await pick(tester, 'Sponsored by', 'Acme');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(householdProvider).accounts.single.label,
+          'Acme 401(k)');
+    });
+
+    testWidgets('two old plans of the same kind are told apart',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      for (var i = 0; i < 2; i++) {
+        await go(tester, 'Accounts');
+        await tester.tap(find.text('Add an account'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Save'));
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+      }
+
+      final labels =
+          container.read(householdProvider).accounts.map((a) => a.label);
+      expect(labels, ["Alex's 401(k)", "Alex's 401(k) 2"],
+          reason: 'two plans from two old jobs cannot share one name');
+    });
+
     testWidgets('an account with no employer is offered no match',
         (tester) async {
       await pumpApp(tester, household: withPerson());
@@ -255,6 +347,671 @@ void main() {
       expect(find.text('Employer matches contributions'), findsNothing,
           reason: 'compensation of zero yields no match, which is the right '
               'answer for an account no employer sponsors');
+    });
+  });
+
+  group('an account is asked only what it needs', () {
+    testWidgets('what it is held in follows what kind it is', (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+
+      expect(shown(tester, 'Invested in'), 'US stocks',
+          reason: 'a 401(k) is the default kind');
+
+      // Savings and checking are not the same holding: one is paid interest
+      // against inflation and the other is only eroded by it.
+      await pick(tester, 'Kind', 'Savings');
+      expect(shown(tester, 'Invested in'), 'Savings interest');
+
+      await pick(tester, 'Kind', 'Checking');
+      expect(shown(tester, 'Invested in'), 'Cash, earning nothing');
+
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(container.read(householdProvider).accounts.single.assetAllocationId,
+          'cash');
+    });
+
+    testWidgets('a bank account is not asked what it paid for its money',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+      await pick(tester, 'Kind', 'Savings');
+
+      expect(find.widgetWithText(TextFormField, 'What you paid for it'),
+          findsNothing);
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Balance'), '40000');
+      await tester.pump();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final account = container.read(householdProvider).accounts.single;
+      expect(account.costBasis, account.balance,
+          reason: 'every dollar in a bank has already been taxed');
+    });
+
+    testWidgets('an emergency fund is a target, offered only on cash',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+
+      expect(dropdown('Emergency fund'), findsNothing,
+          reason: 'a 401(k) is not where anyone keeps one');
+
+      await pick(tester, 'Kind', 'Savings');
+      expect(dropdown('Emergency fund'), findsWidgets);
+      expect(shown(tester, 'Emergency fund'), 'Not the account I keep one in',
+          reason: 'a target nobody set should not quietly become one');
+
+      await pick(tester, 'Emergency fund', '6 months');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(householdProvider).accounts.single
+          .targetBalanceMonths, 6);
+    });
+
+    testWidgets('a dormant account saves as nothing, not as a share of nothing',
+        (tester) async {
+      // The switch hid the fields but left the mode alone, so an old plan for
+      // somebody with no job saved as 0% of a salary that does not exist and
+      // blocked the projection.
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+      await pick(tester, 'Kind', 'TSP');
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Balance'), '90000');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final saved = container.read(householdProvider);
+      final contribution = saved.accounts.single.contribution;
+      expect(contribution.mode, ContributionMode.fixedAmount);
+      expect(contribution.value, 0);
+      expect(contribution.contributionBaseStreamIds, isEmpty);
+      expect(validateHousehold(saved), isEmpty,
+          reason: 'a dormant plan is not a data-entry error');
+    });
+
+    testWidgets('a brokerage is still asked, in words', (tester) async {
+      await pumpApp(tester, household: withPerson());
+      await go(tester, 'Accounts');
+      await tester.tap(find.text('Add an account'));
+      await tester.pumpAndSettle();
+      await pick(tester, 'Kind', 'Brokerage');
+
+      expect(find.widgetWithText(TextFormField, 'What you paid for it'),
+          findsOneWidget);
+      expect(find.text('Cost basis'), findsNothing);
+    });
+  });
+
+  group('what the app already knows, it does not ask', () {
+    testWidgets('a car does not start out appreciating like a house',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add something you own').last);
+      await tester.pumpAndSettle();
+
+      final house = tester.widget<TextFormField>(
+          find.widgetWithText(TextFormField, 'Gains value at'));
+      expect(house.initialValue, '0.5');
+
+      await pick(tester, 'Category', 'Vehicle');
+      final car = tester.widget<TextFormField>(
+          find.widgetWithText(TextFormField, 'Gains value at'));
+      expect(car.initialValue, '-10');
+
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Value today'), '30000');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(
+          container.read(householdProvider).assets.single.realAppreciationRate,
+          closeTo(-0.10, 1e-9));
+    });
+
+    testWidgets('children can be added, having gone missing entirely',
+        (tester) async {
+      // Dependants drive the Child Tax Credit and the household size behind
+      // every health subsidy, and had no editor at all.
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Household');
+      await tester.tap(find.text('Add a dependant'));
+      await tester.pumpAndSettle();
+
+      await pick(tester, 'Born', '${DateTime.now().year - 8}');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final unit = container.read(householdProvider).taxUnits.single;
+      expect(unit.dependents, hasLength(1));
+      expect(unit.dependents.single.birthDate.year, DateTime.now().year - 8);
+      expect(unit.dependents.single.resolvedSupportEndYear,
+          DateTime.now().year - 8 + 19);
+    });
+  });
+
+  group('buying something later', () {
+    testWidgets('a house bought in ten years is enterable at all',
+        (tester) async {
+      // The engine has handled a future purchase since §3.5 was written. The
+      // editor never asked for the year, so there was no way to say it.
+      final household = withPerson().copyWith(accounts: [
+        Account(
+          id: 'a1',
+          personId: 'p1',
+          label: 'Brokerage',
+          kind: AccountKind.taxableBrokerage,
+          taxTreatment: TaxTreatment.taxable,
+          limitFamily: LimitFamily.none,
+          balance: Money.dollars(300000),
+          costBasis: Money.dollars(200000),
+          isRestrictedPurpose: false,
+          contribution:
+              const Contribution(mode: ContributionMode.fixedAmount, value: 0),
+        ),
+      ]);
+      final container = await pumpApp(tester, household: household);
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add something you own').last);
+      await tester.pumpAndSettle();
+
+      await pick(tester, 'When you get it', '${DateTime.now().year + 10}');
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'What it will cost'), '500000');
+      await pick(tester, 'Paid for from', 'Brokerage');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final asset = container.read(householdProvider).assets.single;
+      expect(asset.acquisitionYear, DateTime.now().year + 10);
+      expect(asset.purchaseFundingAccountId, 'a1');
+      expect(asset.costBasis, Money.dollars(500000));
+      expect(asset.currentValue, asset.costBasis,
+          reason: '§3.5: it enters at what it cost, so there is no separate '
+              'value today to hold');
+      expect(asset.heldIn(DateTime.now().year), isFalse,
+          reason: 'it counts for nothing until it is bought');
+      expect(asset.heldIn(DateTime.now().year + 10), isTrue);
+    });
+
+    testWidgets('and answers the housing question from that year',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add something you own').last);
+      await tester.pumpAndSettle();
+      await pick(tester, 'When you get it', '${DateTime.now().year + 5}');
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'What it will cost'), '500000');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final saved = container.read(householdProvider);
+      expect(housedIn(saved, DateTime.now().year), isFalse);
+      expect(housedIn(saved, DateTime.now().year + 5), isTrue);
+    });
+
+    testWidgets('an inheritance names no account to pay from', (tester) async {
+      await pumpApp(tester, household: withPerson());
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add something you own').last);
+      await tester.pumpAndSettle();
+
+      expect(dropdown('Paid for from'), findsNothing,
+          reason: 'nothing to pay for until a purchase year is named');
+      await pick(tester, 'When you get it', '${DateTime.now().year + 3}');
+      expect(dropdown('Paid for from'), findsNothing,
+          reason: 'this household holds no accounts to pay from');
+    });
+  });
+
+  group('a roof and its bills keep the same dates', () {
+    Household owning({int? soldIn}) => withPerson().copyWith(
+          assets: [
+            Asset(
+              id: 'house',
+              householdId: 'h1',
+              label: 'House',
+              category: AssetCategory.primaryResidence,
+              currentValue: Money.dollars(600000),
+              costBasis: Money.dollars(450000),
+              plannedSaleYear: soldIn,
+              saleProceedsAccountId: soldIn == null ? null : 'acct',
+            ),
+          ],
+          expenseCategories: const [
+            ExpenseCategory(
+                id: 'bills',
+                householdId: 'h1',
+                label: 'Housing costs',
+                metaCategory: MetaCategory.housingSupport),
+          ],
+          expenseItems: [
+            ExpenseItem(
+              id: 'tax',
+              categoryId: 'bills',
+              label: 'Property tax',
+              amount: Money.dollars(9000),
+              frequency: ExpenseFrequency.annual,
+              // Dated as the cascade would have left it.
+              endYear: soldIn == null ? null : soldIn - 1,
+              housingId: 'house',
+            ),
+          ],
+        );
+
+    testWidgets('tying a cost to a home adopts that home\'s dates',
+        (tester) async {
+      final container = await pumpApp(tester, household: owning(soldIn: 2046));
+      await go(tester, 'Spending');
+      await tester.tap(find.text('Add to housing costs'));
+      await tester.pumpAndSettle();
+      await pick(tester, 'For which home', 'House, until 2045');
+      expect(find.textContaining('Runs with House, until 2045'),
+          findsOneWidget);
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Amount'), '3000');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final added = container
+          .read(householdProvider)
+          .expenseItems
+          .firstWhere((i) => i.id != 'tax');
+      expect(added.housingId, 'house');
+      expect(added.endYear, 2045);
+    });
+
+    testWidgets('a home is offered with the years it covers', (tester) async {
+      await pumpApp(tester, household: owning(soldIn: 2046));
+      await go(tester, 'Spending');
+      await tester.tap(find.text('Property tax'));
+      await tester.pumpAndSettle();
+      expect(shown(tester, 'For which home'), 'House, until 2045');
+    });
+
+    testWidgets('tying an existing cost moves its dates on screen',
+        (tester) async {
+      // Reported: the field updates on save but the form does not show it.
+      final untied = owning(soldIn: 2046).copyWith(
+        expenseItems: [
+          ExpenseItem(
+            id: 'tax',
+            categoryId: 'bills',
+            label: 'Property tax',
+            amount: Money.dollars(9000),
+            frequency: ExpenseFrequency.annual,
+          ),
+        ],
+      );
+      await pumpApp(tester, household: untied);
+      await go(tester, 'Spending');
+      await tester.tap(find.text('Property tax'));
+      await tester.pumpAndSettle();
+
+      // Its own dates until it is tied to something, and then the home's.
+      expect(shown(tester, 'Ends'), 'It carries on');
+      await pick(tester, 'For which home', 'House, until 2045');
+
+      expect(dropdown('Ends'), findsNothing,
+          reason: 'a cost that follows a home has no dates of its own, and '
+              'two dropdowns that are really derived read as editable');
+      expect(dropdown('Starts'), findsNothing);
+      expect(find.textContaining('Runs with House, until 2045'),
+          findsOneWidget);
+    });
+
+    testWidgets('and can be given its own dates back', (tester) async {
+      await pumpApp(tester, household: owning(soldIn: 2046));
+      await go(tester, 'Spending');
+      await tester.tap(find.text('Property tax'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Runs with House'), findsOneWidget);
+      await tester.ensureVisible(find.text('Give it its own dates'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Give it its own dates'));
+      await tester.pumpAndSettle();
+
+      expect(dropdown('Ends'), findsWidgets);
+      expect(shown(tester, 'Ends'), '2045',
+          reason: 'it keeps the dates it had, and they are now editable');
+    });
+
+    testWidgets('moving the sale year moves the tax with it', (tester) async {
+      final container = await pumpApp(tester, household: owning(soldIn: 2046));
+      final notifier = container.read(householdProvider.notifier);
+      final house = container.read(householdProvider).assets.single;
+
+      notifier.saveAsset(Asset(
+        id: house.id,
+        householdId: house.householdId,
+        label: house.label,
+        category: house.category,
+        currentValue: house.currentValue,
+        costBasis: house.costBasis,
+        plannedSaleYear: 2038,
+        saleProceedsAccountId: 'acct',
+      ));
+
+      expect(container.read(householdProvider).expenseItems.single.endYear,
+          2037,
+          reason: 'the bills end the year before the house is sold');
+    });
+
+    testWidgets('and a house nobody sells leaves them open-ended',
+        (tester) async {
+      final container = await pumpApp(tester, household: owning(soldIn: 2046));
+      final notifier = container.read(householdProvider.notifier);
+      final house = container.read(householdProvider).assets.single;
+
+      notifier.saveAsset(Asset(
+        id: house.id,
+        householdId: house.householdId,
+        label: house.label,
+        category: house.category,
+        currentValue: house.currentValue,
+        costBasis: house.costBasis,
+      ));
+      expect(container.read(householdProvider).expenseItems.single.endYear,
+          isNull);
+    });
+
+    testWidgets('a cost tied to nothing is left alone', (tester) async {
+      final loose = owning(soldIn: 2046).copyWith(
+        expenseItems: [
+          ExpenseItem(
+            id: 'tax',
+            categoryId: 'bills',
+            label: 'Property tax',
+            amount: Money.dollars(9000),
+            frequency: ExpenseFrequency.annual,
+            endYear: 2060,
+          ),
+        ],
+      );
+      final container = await pumpApp(tester, household: loose);
+      final house = container.read(householdProvider).assets.single;
+      container.read(householdProvider.notifier).saveAsset(Asset(
+            id: house.id,
+            householdId: house.householdId,
+            label: house.label,
+            category: house.category,
+            currentValue: house.currentValue,
+            costBasis: house.costBasis,
+            plannedSaleYear: 2038,
+            saleProceedsAccountId: 'acct',
+          ));
+      expect(container.read(householdProvider).expenseItems.single.endYear,
+          2060,
+          reason: 'unattached means it keeps its own dates');
+    });
+  });
+
+  group('an editor is not dismissed by a stray click', () {
+    testWidgets('clicking beside the form leaves it open', (tester) async {
+      // The trap: the form scrolls, so a click aimed at a control below the
+      // fold lands on the scrim and throws away everything typed so far.
+      await pumpApp(tester, household: withPerson());
+      await go(tester, 'Spending');
+      await tester.tap(find.text('Add spending'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Amount'), '1234');
+      await tester.tapAt(const Offset(20, 20));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(TextFormField, 'Amount'), findsOneWidget,
+          reason: 'a half-filled editor should not vanish');
+      expect(find.text('Save'), findsOneWidget);
+    });
+
+    testWidgets('and the close button still closes it', (tester) async {
+      await pumpApp(tester, household: withPerson());
+      await go(tester, 'Spending');
+      await tester.tap(find.text('Add spending'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('Save'), findsNothing);
+    });
+  });
+
+  group('housing costs sit under the roof they pay for', () {
+    testWidgets('grouped by home, with anything loose called out',
+        (tester) async {
+      final h = withPerson().copyWith(
+        assets: [
+          Asset(
+            id: 'house',
+            householdId: 'h1',
+            label: 'House',
+            category: AssetCategory.primaryResidence,
+            currentValue: Money.dollars(600000),
+            costBasis: Money.dollars(450000),
+            plannedSaleYear: 2046,
+            saleProceedsAccountId: 'acct',
+          ),
+        ],
+        expenseCategories: const [
+          ExpenseCategory(
+              id: 'bills',
+              householdId: 'h1',
+              label: 'Housing costs',
+              metaCategory: MetaCategory.housingSupport),
+        ],
+        expenseItems: [
+          ExpenseItem(
+            id: 'tax',
+            categoryId: 'bills',
+            label: 'Property tax',
+            amount: Money.dollars(9000),
+            frequency: ExpenseFrequency.annual,
+            endYear: 2045,
+            housingId: 'house',
+          ),
+          ExpenseItem(
+            id: 'phone',
+            categoryId: 'bills',
+            label: 'Broadband',
+            amount: Money.dollars(900),
+            frequency: ExpenseFrequency.annual,
+          ),
+        ],
+      );
+      await pumpApp(tester, household: h);
+      await go(tester, 'Spending');
+
+      expect(find.text('House, until 2045'), findsOneWidget);
+      expect(find.text('Not tied to a home'), findsOneWidget);
+
+      final tied = tester.getTopLeft(find.text('Property tax')).dy;
+      final under = tester.getTopLeft(find.text('House, until 2045')).dy;
+      final loose = tester.getTopLeft(find.text('Not tied to a home')).dy;
+      expect(under, lessThan(tied));
+      expect(tied, lessThan(loose),
+          reason: 'the unattached group comes last, being the one worth '
+              'noticing');
+    });
+  });
+
+  group('renting is an answer', () {
+    testWidgets('the property page offers it when nothing is owned',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Property');
+      expect(find.text('I rent'), findsOneWidget);
+
+      await tester.tap(find.text('I rent'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Rent a month'), '1800');
+      await tester.tap(find.text('Add it'));
+      await tester.pumpAndSettle();
+
+      final saved = container.read(householdProvider);
+      expect(saved.expenseItems.single.amount, Money.dollars(21600));
+      expect(saved.expenseItems.single.startYear, isNull,
+          reason: 'rent already being paid starts now, not in a named year');
+      expect(housedIn(saved, DateTime.now().year), isTrue);
+      expect(find.text('I rent'), findsNothing);
+    });
+  });
+
+  group('somewhere to live', () {
+    testWidgets('selling a home asks where they will live', (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add something you own').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Value today'), '600000');
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Planned sale year'), '2040');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Where will you live from 2040?'), findsOneWidget);
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Rent a month, from 2040'),
+          '2000');
+      await tester.tap(find.text('Add it'));
+      await tester.pumpAndSettle();
+
+      final saved = container.read(householdProvider);
+      final rent = saved.expenseItems.single;
+      expect(rent.amount, Money.dollars(24000));
+      expect(rent.startYear, 2040);
+      expect(housedIn(saved, 2041), isTrue);
+    });
+
+    testWidgets('and takes no for an answer', (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add something you own').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Value today'), '600000');
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Planned sale year'), '2040');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('I will sort it out later'));
+      await tester.pumpAndSettle();
+      expect(container.read(householdProvider).expenseItems, isEmpty);
+    });
+
+    testWidgets('a home nobody is selling is not asked about', (tester) async {
+      await pumpApp(tester, household: withPerson());
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add something you own').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.widgetWithText(TextFormField, 'Value today'), '600000');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Where will you live'), findsNothing);
+    });
+  });
+
+  group('a name nobody had to think of', () {
+    testWidgets('a debt is named after what it is secured against',
+        (tester) async {
+      final household = withPerson().copyWith(assets: [
+        Asset(
+          id: 'as1',
+          householdId: 'h1',
+          label: 'House',
+          category: AssetCategory.primaryResidence,
+          currentValue: Money.dollars(600000),
+          costBasis: Money.dollars(450000),
+        ),
+      ]);
+      final container = await pumpApp(tester, household: household);
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add a debt').last);
+      await tester.pumpAndSettle();
+      await pick(tester, 'Secured against', 'House');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final debt = container.read(householdProvider).liabilities.single;
+      expect(debt.label, 'House mortgage');
+      expect(debt.securedAssetId, 'as1');
+    });
+
+    testWidgets('linking a mortgage to a house links the house back',
+        (tester) async {
+      // Invariant 5 wants both ends to agree, and a user should not have to
+      // know that.
+      final household = withPerson().copyWith(assets: [
+        Asset(
+          id: 'as1',
+          householdId: 'h1',
+          label: 'House',
+          category: AssetCategory.primaryResidence,
+          currentValue: Money.dollars(600000),
+          costBasis: Money.dollars(450000),
+        ),
+      ]);
+      final container = await pumpApp(tester, household: household);
+      await go(tester, 'Property');
+      await tester.tap(find.text('Add a debt').last);
+      await tester.pumpAndSettle();
+      await pick(tester, 'Secured against', 'House');
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final saved = container.read(householdProvider);
+      expect(saved.assets.single.securedByLiabilityId,
+          saved.liabilities.single.id);
+      expect(validateHousehold(saved), isEmpty);
+    });
+
+    testWidgets('a second car is not called the same as the first',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      for (var i = 0; i < 2; i++) {
+        await go(tester, 'Property');
+        await tester.tap(find.text('Add something you own').last);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Save'));
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+      }
+      expect(container.read(householdProvider).assets.map((a) => a.label),
+          ['House', 'House 2']);
     });
   });
 
@@ -444,6 +1201,7 @@ void main() {
         child: MaterialApp(theme: lightTheme(), home: const HomeShell()),
       ));
       await tester.pump();
+      await go(tester, 'Household');
 
       container.read(householdProvider.notifier).saveTaxUnit(TaxUnit(
             id: 'tu1',

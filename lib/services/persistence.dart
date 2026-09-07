@@ -53,7 +53,9 @@ class Persistence {
       if (ids.isNotEmpty) {
         final bundle = await db.loadBundle(ids.first);
         if (bundle != null) {
-          _ref.read(householdProvider.notifier).replace(bundle.household);
+          _ref
+              .read(householdProvider.notifier)
+              .replace(withSavingsSplit(bundle));
           if (bundle.scenarios.isNotEmpty) {
             _ref.read(scenarioProvider.notifier).replace(bundle.scenarios.first);
           }
@@ -61,6 +63,10 @@ class Persistence {
             _ref
                 .read(assetClassesProvider.notifier)
                 .replace(bundle.assetClasses);
+          }
+          final setup = await db.loadSetup(ids.first);
+          if (setup != null) {
+            _ref.read(setupProgressProvider.notifier).replace(setup);
           }
         }
       }
@@ -74,10 +80,39 @@ class Persistence {
     }
   }
 
+  /// A plan written before savings and idle cash were separate classes has its
+  /// savings accounts pointing at the one cash class there was. That was never
+  /// a choice anybody made, since there was nothing to choose between, so it is
+  /// moved to the class that now describes it.
+  static Household withSavingsSplit(ExportBundle bundle) {
+    final alreadySplit = bundle.assetClasses
+        .any((c) => c.label == AssetClassLabel.savings);
+    if (alreadySplit) return bundle.household;
+
+    final savings = AssetClassesNotifier.defaults
+        .firstWhere((c) => c.label == AssetClassLabel.savings);
+    final idle = bundle.assetClasses
+        .where((c) => c.label == AssetClassLabel.cash)
+        .map((c) => c.id)
+        .toSet();
+
+    return bundle.household.copyWith(
+      accounts: [
+        for (final account in bundle.household.accounts)
+          if (account.kind == AccountKind.cashSavings &&
+              idle.contains(account.assetAllocationId))
+            account.withAllocation(savings.id)
+          else
+            account,
+      ],
+    );
+  }
+
   void _watch() {
     _ref.listen(householdProvider, (_, _) => _schedule());
     _ref.listen(scenarioProvider, (_, _) => _schedule());
     _ref.listen(assetClassesProvider, (_, _) => _schedule());
+    _ref.listen(setupProgressProvider, (_, _) => _schedule());
   }
 
   void _schedule() {
@@ -92,11 +127,13 @@ class Persistence {
     _pending?.cancel();
     if (!_loaded) return;
     final db = await _ref.read(databaseProvider.future);
+    final household = _ref.read(householdProvider);
     await db.saveBundle(ExportBundle(
-      household: _ref.read(householdProvider),
+      household: household,
       scenarios: [_ref.read(scenarioProvider)],
       assetClasses: _ref.read(assetClassesProvider),
     ));
+    await db.saveSetup(household.id, _ref.read(setupProgressProvider));
   }
 
   void dispose() => _pending?.cancel();

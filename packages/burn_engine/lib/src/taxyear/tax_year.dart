@@ -131,6 +131,25 @@ class ApplicablePercentagePoint {
   });
 }
 
+/// The deduction for people aged 65 and over that the 2025 act added on top of
+/// §63(f), and which lapses after [throughYear] unless Congress extends it.
+///
+/// The statute reduces the per-person amount rather than the household total,
+/// so a couple loses it at the same income a single filer does.
+class SeniorDeduction {
+  final Indexed amountPerPerson;
+  final int minAge;
+  final int throughYear;
+  final Map<FilingStatus, PhaseOut> phaseOut;
+
+  const SeniorDeduction({
+    required this.amountPerPerson,
+    required this.minAge,
+    required this.throughYear,
+    required this.phaseOut,
+  });
+}
+
 /// One IRMAA tier: monthly, per person, against MAGI from two years prior.
 class IrmaaBracket {
   final Money magiThreshold;
@@ -155,6 +174,10 @@ class JurisdictionRules {
   final Map<FilingStatus, Money> standardDeduction;
   final Map<FilingStatus, Money> personalExemption;
 
+  /// Subtracted from the tax rather than from income, which is how eight
+  /// states give what elsewhere is an exemption.
+  final Map<FilingStatus, Money> personalCredit;
+
   /// Whether this jurisdiction follows the federal treatment of pre-tax
   /// deferrals. False for Pennsylvania and similar (§4.3.3).
   final bool conformsToPreTaxDeferrals;
@@ -167,6 +190,7 @@ class JurisdictionRules {
     this.flatRate,
     this.standardDeduction = const {},
     this.personalExemption = const {},
+    this.personalCredit = const {},
     this.conformsToPreTaxDeferrals = true,
     this.retirementIncomeExclusion = const {},
   });
@@ -176,6 +200,7 @@ class JurisdictionRules {
 
   Money standardDeductionFor(FilingStatus status) => _amount(standardDeduction, status);
   Money personalExemptionFor(FilingStatus status) => _amount(personalExemption, status);
+  Money personalCreditFor(FilingStatus status) => _amount(personalCredit, status);
   Money retirementIncomeExclusionFor(FilingStatus status) =>
       _amount(retirementIncomeExclusion, status);
 
@@ -195,7 +220,13 @@ class TaxYear {
   final Map<FilingStatus, List<TaxBracket>> federalBrackets;
   final Map<FilingStatus, List<TaxBracket>> federalLtcgBrackets;
   final Map<FilingStatus, Indexed> standardDeduction;
-  final Indexed additionalStandardDeductionAge65;
+  /// §63(f) is \$2,050 a head for someone unmarried, \$1,650 for everyone else,
+  /// and the pipeline applies it once per person aged 65 or over.
+  final Map<FilingStatus, Indexed> additionalStandardDeductionAge65;
+
+  /// Null in a year that has none, which is every year after 2028 as the law
+  /// stands.
+  final SeniorDeduction? seniorDeduction;
 
   // §199A
   final Rate qbiDeductionRate;
@@ -249,7 +280,7 @@ class TaxYear {
 
   // ACA and Medicare
   final Map<String, Map<int, Money>> federalPovertyLevel;
-  final Money federalPovertyLevelIncrement;
+  final Map<String, Money> federalPovertyLevelIncrement;
   final List<ApplicablePercentagePoint> acaApplicablePercentageTable;
   final double acaMinimumFplPercent;
   final double? acaMaximumFplPercent;
@@ -272,6 +303,7 @@ class TaxYear {
     required this.federalLtcgBrackets,
     required this.standardDeduction,
     required this.additionalStandardDeductionAge65,
+    this.seniorDeduction,
     required this.qbiDeductionRate,
     required this.qbiThreshold,
     required this.studentLoanInterestCap,
@@ -355,10 +387,14 @@ class TaxYear {
   /// The poverty line for a tax unit of [size] in [stateCode], extended past
   /// the published table by its own increment (§3.12).
   Money povertyLevel(String stateCode, int size) {
-    final table = federalPovertyLevel[stateCode] ?? federalPovertyLevel['US']!;
+    final region = federalPovertyLevel.containsKey(stateCode) ? stateCode : 'US';
+    final table = federalPovertyLevel[region]!;
     if (table.containsKey(size)) return table[size]!;
     final sizes = table.keys.toList()..sort();
     final largest = sizes.last;
-    return table[largest]! + federalPovertyLevelIncrement * (size - largest);
+    // Alaska and Hawaii add more per person than the mainland does.
+    final increment = federalPovertyLevelIncrement[region] ??
+        federalPovertyLevelIncrement['US']!;
+    return table[largest]! + increment * (size - largest);
   }
 }

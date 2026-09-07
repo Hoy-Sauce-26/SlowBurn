@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../screens/setup_screen.dart';
 import '../services/providers.dart';
+import '../services/readiness.dart';
 import 'metric_card.dart';
+import 'setup_checklist.dart';
 
 /// The desktop feature: the answer, beside the inputs, moving as they change.
 ///
@@ -12,29 +15,50 @@ import 'metric_card.dart';
 /// other two are a comparison the user asks for rather than one they are
 /// handed.
 class ResultsPanel extends ConsumerWidget {
-  const ResultsPanel({super.key});
+  /// Whether to carry the checklist while a plan is still being built. False
+  /// where the main view is already showing it.
+  final bool showsSetup;
+
+  const ResultsPanel({super.key, this.showsSetup = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final projection = ref.watch(projectionProvider);
     final findings = ref.watch(findingsProvider);
     final flags = ref.watch(flagsProvider);
+    final building = !ref
+        .watch(setupProgressProvider)
+        .showsProjection(ref.watch(householdProvider));
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         Text('Your plan', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
-        projection.when(
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: CircularProgressIndicator(),
+        if (building && showsSetup)
+          SetupChecklist(
+            onContinue: () => SetupFlow.open(
+              context,
+              at: ref.read(setupProgressProvider).nextFor(
+                    ref.read(householdProvider),
+                  ) ??
+                  SetupStep.spending,
             ),
+          )
+        else if (building)
+          const _NothingYet(
+              reason: 'Nothing is worked out until you say the plan is ready.')
+        else
+          projection.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+            error: (error, _) => _NothingYet(reason: '$error'),
+            data: (bands) => _Headlines(result: bands.expected),
           ),
-          error: (error, _) => _NothingYet(reason: '$error'),
-          data: (bands) => _Headlines(result: bands.expected),
-        ),
         if (findings.isNotEmpty) ...[
           const SizedBox(height: 24),
           _Findings(findings: findings),
@@ -209,6 +233,7 @@ const flagLabels = <String, String>{
   'rothIraIncomeLimitReached': 'Roth income limit',
   'hsaContributionsStoppedAtMedicare': 'HSA stopped at 65',
   'escrowDiffersFromInferred': 'Escrow disagrees',
+  'noHousingCost': 'Nowhere to live',
   'payoffLeavesResidualEscrow': 'Escrow after payoff',
   'derivedPayoffDiffersFromTerm': 'Payoff disagrees',
   'possibleDoubleCount': 'Possible double count',
@@ -252,6 +277,11 @@ const flagExplanations = <String, String>{
       'Income is above the Roth IRA limit; the backdoor route is not modelled.',
   'hsaContributionsStoppedAtMedicare':
       'Medicare enrolment ends HSA eligibility at 65.',
+  'noHousingCost':
+      'For part of this plan the household owns no home and pays nothing for '
+          'housing, so it is being projected as though shelter were free. '
+          'Selling a house is one field; where you live afterwards is '
+          'another.',
   'escrowDiffersFromInferred':
       'The entered escrow disagrees with what the payment implies.',
   'payoffLeavesResidualEscrow':

@@ -59,6 +59,46 @@ void main() {
     });
   });
 
+  group('the 2026 federal figures', () {
+    test('carry the published amounts, not last year\'s', () {
+      expect(ty.standardDeduction[FilingStatus.single]!.value,
+          Money.dollars(16100));
+      expect(ty.standardDeduction[FilingStatus.marriedFilingJointly]!.value,
+          Money.dollars(32200));
+      expect(ty.federalBrackets[FilingStatus.single]!.first.upTo,
+          Money.dollars(12400));
+      expect(ty.federalBrackets[FilingStatus.marriedFilingJointly]![5].upTo,
+          Money.dollars(768700));
+      expect(ty.socialSecurityWageBase, Money.dollars(184500));
+      expect(ty.contributionLimits[LimitFamily.electiveDeferral]!.annual,
+          Money.dollars(24500));
+      expect(ty.annualAdditions415c, Money.dollars(72000));
+      expect(ty.federalPovertyLevel['US']![1], Money.dollars(15960));
+    });
+
+    test('give a married couple the smaller age-65 addition each', () {
+      // §63(f) is $2,050 a head for someone unmarried and $1,650 otherwise,
+      // and the pipeline adds one per person over 65.
+      expect(ty.additionalStandardDeductionAge65[FilingStatus.single]!.value,
+          Money.dollars(2050));
+      expect(
+          ty.additionalStandardDeductionAge65[
+                  FilingStatus.marriedFilingJointly]!
+              .value,
+          Money.dollars(1650));
+    });
+
+    test('put the premium tax credit back on its pre-2021 schedule', () {
+      // The enhanced credits expired with 2025: contributions rise at every
+      // income and the 400% cliff returns.
+      expect(ty.acaMaximumFplPercent, 400,
+          reason: 'above four times the poverty line the credit is gone');
+      expect(ty.acaApplicablePercentageTable.first.applicablePercent, 0.0210,
+          reason: 'the poorest household now contributes something');
+      expect(ty.acaApplicablePercentageTable.last.applicablePercent, 0.0996);
+    });
+  });
+
   group('the state layer', () {
     test('covers every state and DC, so no household is unpriced', () {
       expect(ty.stateRules, hasLength(51));
@@ -137,12 +177,21 @@ void main() {
     test('the poverty level extends by its own published increment', () {
       final eight = ty.povertyLevel('US', 8);
       final ten = ty.povertyLevel('US', 10);
-      expect(ten - eight, ty.federalPovertyLevelIncrement * 2);
+      expect(ten - eight, ty.federalPovertyLevelIncrement['US']! * 2);
     });
 
     test('Alaska and Hawaii carry their own higher figures', () {
       expect(ty.povertyLevel('AK', 1) > ty.povertyLevel('US', 1), isTrue);
       expect(ty.povertyLevel('HI', 1) > ty.povertyLevel('US', 1), isTrue);
+    });
+
+    test('and extend by their own increment past the published table', () {
+      // Alaska adds $7,100 a head where the mainland adds $5,680, so a large
+      // household there was being shown too low a poverty line.
+      expect(ty.povertyLevel('AK', 10) - ty.povertyLevel('AK', 8),
+          ty.federalPovertyLevelIncrement['AK']! * 2);
+      expect(ty.federalPovertyLevelIncrement['AK']! >
+          ty.federalPovertyLevelIncrement['US']!, isTrue);
     });
   });
 

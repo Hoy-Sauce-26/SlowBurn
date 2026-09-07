@@ -22,7 +22,7 @@ class OneTimeEvent {
   final OneTimeEventKind kind;
 
   /// Destination for an inflow, source for an outflow. Required for outflows
-  /// (invariant 17).
+  /// (invariant 16).
   final Id? accountId;
 
   final EventTaxTreatment taxTreatment;

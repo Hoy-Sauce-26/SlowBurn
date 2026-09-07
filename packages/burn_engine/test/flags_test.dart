@@ -275,6 +275,43 @@ void main() {
               const Assumptions(taxYearId: 'x', safeWithdrawalRate: 0.04), 25),
           isFalse);
     });
+
+    test('but a short one is not a licence for any rate at all', () {
+      expect(
+          swrHorizonMismatch(
+              const Assumptions(taxYearId: 'x', safeWithdrawalRate: 0.06), 25),
+          isTrue);
+    });
+
+    test('the flag and the suggestion read the same ladder', () {
+      // Recommending a rate and then flagging it is the kind of thing that
+      // happens when two functions each hold their own copy of a threshold.
+      for (final years in [10, 25, 30, 35, 44, 45, 60]) {
+        final suggested = suggestedWithdrawalRate(years);
+        expect(
+            swrHorizonMismatch(
+                Assumptions(taxYearId: 'x', safeWithdrawalRate: suggested),
+                years),
+            isFalse,
+            reason: 'what the app offers for $years years must not be '
+                'flagged');
+      }
+    });
+
+    test('a longer retirement never suggests a higher rate', () {
+      var previous = 1.0;
+      for (var years = 5; years <= 60; years++) {
+        final rate = suggestedWithdrawalRate(years);
+        expect(rate <= previous, isTrue);
+        previous = rate;
+      }
+    });
+
+    test('thirty years lands on the rule everybody quotes', () {
+      expect(suggestedWithdrawalRate(30), 0.045);
+      expect(suggestedWithdrawalRate(35), 0.040);
+      expect(suggestedWithdrawalRate(50), 0.035);
+    });
   });
 
   group('§8.4.1 the assumed rollover', () {

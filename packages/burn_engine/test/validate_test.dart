@@ -100,7 +100,64 @@ void main() {
     });
   });
 
-  group('accounting (§12.12–15)', () {
+  group('a share of nothing', () {
+    test('an account nobody pays into needs no salary behind it', () {
+      // What it looked like in the app: a spouse's old TSP, dormant, with no
+      // employer and no income, reported as "a percentage of nothing" and
+      // blocking the whole projection over a contribution of zero.
+      final h = Household(
+        id: 'h1',
+        taxUnits: [taxUnit()],
+        people: [person()],
+        accounts: [
+          Account(
+            id: 'tsp',
+            personId: 'p1',
+            label: "Masha's TSP",
+            kind: AccountKind.traditionalTsp,
+            taxTreatment: TaxTreatment.taxDeferred,
+            limitFamily: LimitFamily.electiveDeferral,
+            balance: Money.dollars(90000),
+            isRestrictedPurpose: false,
+            assetAllocationId: 'stocks',
+            contribution: const Contribution(
+              mode: ContributionMode.percentOfGross,
+              value: 0,
+            ),
+          ),
+        ],
+      );
+      expect(validateHousehold(h), isEmpty);
+    });
+
+    test('a real percentage still needs one', () {
+      final h = Household(
+        id: 'h1',
+        taxUnits: [taxUnit()],
+        people: [person()],
+        accounts: [
+          Account(
+            id: 'tsp',
+            personId: 'p1',
+            label: 'TSP',
+            kind: AccountKind.traditionalTsp,
+            taxTreatment: TaxTreatment.taxDeferred,
+            limitFamily: LimitFamily.electiveDeferral,
+            balance: Money.dollars(90000),
+            isRestrictedPurpose: false,
+            assetAllocationId: 'stocks',
+            contribution: const Contribution(
+              mode: ContributionMode.percentOfGross,
+              value: 10,
+            ),
+          ),
+        ],
+      );
+      expect(numbersFrom(validateHousehold(h)), contains(8));
+    });
+  });
+
+  group('accounting (§12.12–14)', () {
     test('a negative contribution would be an untaxed withdrawal', () {
       final h = Household(
         id: 'h1',
@@ -118,16 +175,17 @@ void main() {
       expect(numbersFrom(validateHousehold(h)), contains(12));
     });
 
-    test('basis above balance warns rather than blocks, losses being real', () {
+    test('a holding that has fallen in value is not worth mentioning', () {
+      // Shares go down. Basis above balance is an unrealised loss, which §6.3
+      // already clamps to a zero gain, so saying so only teaches the user
+      // that the app does not know what a market is.
       final h = Household(
         id: 'h1',
         taxUnits: [taxUnit()],
         people: [person()],
         accounts: [brokerage(balance: 50000, basis: 60000)],
       );
-      final findings = validateHousehold(h);
-      expect(numbersFrom(findings), contains(13));
-      expect(findings.hasBlocking, isFalse);
+      expect(validateHousehold(h), isEmpty);
     });
 
     test('PMI cannot exceed the escrow it is part of', () {
@@ -151,11 +209,11 @@ void main() {
           ),
         ],
       );
-      expect(numbersFrom(validateHousehold(h)), contains(15));
+      expect(numbersFrom(validateHousehold(h)), contains(14));
     });
   });
 
-  group('money that goes nowhere (§12.17–18)', () {
+  group('money that goes nowhere (§12.16–17)', () {
     test('an outflow must name the account it comes from', () {
       final h = Household(
         id: 'h1',
@@ -171,7 +229,7 @@ void main() {
           ),
         ],
       );
-      expect(numbersFrom(validateHousehold(h)), contains(17));
+      expect(numbersFrom(validateHousehold(h)), contains(16));
     });
 
     test('a planned sale must say where the proceeds land', () {
@@ -191,11 +249,11 @@ void main() {
           ),
         ],
       );
-      expect(numbersFrom(validateHousehold(h)), contains(18));
+      expect(numbersFrom(validateHousehold(h)), contains(17));
     });
   });
 
-  group('attribution once a household files twice (§12.25)', () {
+  group('attribution once a household files twice (§12.24)', () {
     test('one tax unit needs no attribution', () {
       final h = Household(
         id: 'h1',
@@ -212,7 +270,7 @@ void main() {
           ),
         ],
       );
-      expect(numbersFrom(validateHousehold(h)), isNot(contains(25)));
+      expect(numbersFrom(validateHousehold(h)), isNot(contains(24)));
     });
 
     test('two tax units make an unattributed asset ambiguous', () {
@@ -231,11 +289,11 @@ void main() {
           ),
         ],
       );
-      expect(numbersFrom(validateHousehold(h)), contains(25));
+      expect(numbersFrom(validateHousehold(h)), contains(24));
     });
   });
 
-  group('limits and rates (§12.27–30)', () {
+  group('limits and rates (§12.26–29)', () {
     test('claiming outside 62 to 70 is refused', () {
       final h = Household(
         id: 'h1',
@@ -250,7 +308,7 @@ void main() {
           ),
         ],
       );
-      expect(numbersFrom(validateHousehold(h)), contains(27));
+      expect(numbersFrom(validateHousehold(h)), contains(26));
     });
 
     test('a tax-advantaged account cannot be uncapped', () {
@@ -275,7 +333,7 @@ void main() {
           ),
         ],
       );
-      expect(numbersFrom(validateHousehold(h)), contains(29));
+      expect(numbersFrom(validateHousehold(h)), contains(28));
     });
 
     test('a waterfall with no terminal step strands the surplus', () {
@@ -286,12 +344,12 @@ void main() {
           WaterfallStep.iraToLimit,
         ],
       );
-      expect(numbersFrom(validateAssumptions(a)), contains(30));
+      expect(numbersFrom(validateAssumptions(a)), contains(29));
     });
 
     test('a zero withdrawal rate would divide §8.1 by zero', () {
       const a = Assumptions(taxYearId: 'us-2026', safeWithdrawalRate: 0);
-      expect(numbersFrom(validateAssumptions(a)), contains(28));
+      expect(numbersFrom(validateAssumptions(a)), contains(27));
     });
 
     test('the default assumptions are valid', () {

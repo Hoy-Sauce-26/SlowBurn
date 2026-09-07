@@ -351,14 +351,22 @@ Money _jurisdictionTax(
             ? a.contribution.value.round()
             : 0)));
   }
+  // An exclusion offsets retirement income and nothing else, so it is capped
+  // by how much of that the unit actually received.
+  final retirementIncome = income.pensionIncome + income.rmdIncome;
+  final exclusion =
+      _minOf([rules.retirementIncomeExclusionFor(status), retirementIncome]);
+
   final taxable = (base -
           rules.standardDeductionFor(status) -
           rules.personalExemptionFor(status) -
-          rules.retirementIncomeExclusionFor(status))
+          exclusion)
       .orZeroIfNegative;
 
-  if (rules.flatRate != null) return taxable * rules.flatRate!;
-  return applyBrackets(taxable, rules.bracketsFor(status));
+  final tax = rules.flatRate != null
+      ? taxable * rules.flatRate!
+      : applyBrackets(taxable, rules.bracketsFor(status));
+  return (tax - rules.personalCreditFor(status)).orZeroIfNegative;
 }
 
 Money _minOf(List<Money> values) =>

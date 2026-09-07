@@ -227,6 +227,11 @@ Future<T?> showEditor<T>(
   if (wide) {
     return showDialog<T>(
       context: context,
+      // The form scrolls, so a click aimed at a control below the fold can
+      // land on the scrim instead. Dismissing a half-filled editor because
+      // somebody missed a button by ten pixels is not a reasonable trade for
+      // the convenience of clicking away, and the close button is right there.
+      barrierDismissible: false,
       builder: (context) => Dialog(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
@@ -239,6 +244,7 @@ Future<T?> showEditor<T>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    isDismissible: false,
     builder: (context) => FractionallySizedBox(
       heightFactor: 0.92,
       child: _EditorFrame(title: title, child: build(context)),

@@ -38,7 +38,10 @@ TaxYear taxYearFromJson(Map<String, dynamic> j) {
     federalLtcgBrackets: _byStatus(need('federalLtcgBrackets'), _brackets),
     standardDeduction: _byStatus(need('standardDeduction'), _indexed),
     additionalStandardDeductionAge65:
-        _indexed(need('additionalStandardDeductionAge65')),
+        _byStatus(need('additionalStandardDeductionAge65'), _indexed),
+    seniorDeduction: j['seniorDeduction'] == null
+        ? null
+        : _seniorDeduction(j['seniorDeduction']),
     qbiDeductionRate: _rate(need('qbiDeductionRate')),
     qbiThreshold: _byStatus(need('qbiThreshold'), _indexed),
     studentLoanInterestCap: _indexed(need('studentLoanInterestCap')),
@@ -90,7 +93,9 @@ TaxYear taxYearFromJson(Map<String, dynamic> j) {
     federalPovertyLevel: (need<Map<String, dynamic>>('federalPovertyLevel'))
         .map((state, table) =>
             MapEntry(state, _intMap(table, (v) => _money(v)))),
-    federalPovertyLevelIncrement: _money(need('federalPovertyLevelIncrement')),
+    federalPovertyLevelIncrement:
+        (need<Map<String, dynamic>>('federalPovertyLevelIncrement'))
+            .map((region, v) => MapEntry(region, _money(v))),
     acaApplicablePercentageTable:
         (need<List<dynamic>>('acaApplicablePercentageTable'))
             .map((p) => ApplicablePercentagePoint(
@@ -129,6 +134,16 @@ Money _money(dynamic v) {
 }
 
 Rate _rate(dynamic v) => (v as num).toDouble();
+
+SeniorDeduction _seniorDeduction(dynamic v) {
+  final m = v as Map<String, dynamic>;
+  return SeniorDeduction(
+    amountPerPerson: _indexed(m['amountPerPerson']),
+    minAge: m['minAge'] as int,
+    throughYear: m['throughYear'] as int,
+    phaseOut: _byStatus(m['phaseOut'], _phaseOut),
+  );
+}
 
 Indexed _indexed(dynamic v) {
   final m = v as Map<String, dynamic>;
@@ -216,6 +231,8 @@ Map<String, JurisdictionRules> _jurisdictions(dynamic v) =>
                 _jurisdictionByStatus<Money>(r['standardDeduction'], _money),
             personalExemption:
                 _jurisdictionByStatus<Money>(r['personalExemption'], _money),
+            personalCredit:
+                _jurisdictionByStatus<Money>(r['personalCredit'], _money),
             conformsToPreTaxDeferrals:
                 r['conformsToPreTaxDeferrals'] as bool? ?? true,
             retirementIncomeExclusion:

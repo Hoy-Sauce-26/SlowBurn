@@ -8,7 +8,7 @@ class Asset {
   final Id householdId;
 
   /// Whose `TaxUnit` its sale gain is taxed on. Null means jointly held, which
-  /// resolves to the household's only `TaxUnit` (invariant 25).
+  /// resolves to the household's only `TaxUnit` (invariant 24).
   final Id? personId;
 
   final String label;
@@ -36,7 +36,7 @@ class Asset {
   final Id? purchaseFundingAccountId;
 
   /// Year the household sells it. Requires [saleProceedsAccountId]
-  /// (invariant 18).
+  /// (invariant 17).
   final int? plannedSaleYear;
   final Id? saleProceedsAccountId;
 
@@ -57,6 +57,26 @@ class Asset {
     this.plannedSaleYear,
     this.saleProceedsAccountId,
   });
+
+  /// The same asset, pointing at a different debt or at none. Invariant 5 asks
+  /// the two ends of that link to agree, so whatever changes one changes both.
+  Asset withSecuring(Id? liabilityId) => Asset(
+        id: id,
+        householdId: householdId,
+        personId: personId,
+        label: label,
+        category: category,
+        currentValue: currentValue,
+        costBasis: costBasis,
+        realAppreciationRate: realAppreciationRate,
+        accumulatedDepreciation: accumulatedDepreciation,
+        landFraction: landFraction,
+        securedByLiabilityId: liabilityId,
+        acquisitionYear: acquisitionYear,
+        purchaseFundingAccountId: purchaseFundingAccountId,
+        plannedSaleYear: plannedSaleYear,
+        saleProceedsAccountId: saleProceedsAccountId,
+      );
 
   /// Whether the household owns this in [year] (§3.5). Before acquisition it is
   /// absent from every net-worth measure; from the sale year forward, likewise.

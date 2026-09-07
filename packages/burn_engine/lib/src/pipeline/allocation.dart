@@ -9,11 +9,12 @@ import '../types.dart';
 /// The weights an account's allocation resolves to, whichever mode it uses.
 Iterable<({AssetClass cls, double weight})> _blend(
   Account account,
-  Map<Id, AssetClass> classes,
-) sync* {
+  Map<Id, AssetClass> classes, {
+  bool retired = false,
+}) sync* {
   switch (account.allocationMode) {
     case AllocationMode.singleClass:
-      final cls = classes[account.assetAllocationId];
+      final cls = classes[account.allocationIn(retired: retired)];
       if (cls != null) yield (cls: cls, weight: 1.0);
     case AllocationMode.weighted:
       for (final w in account.allocationWeights) {
@@ -27,14 +28,16 @@ Iterable<({AssetClass cls, double weight})> _blend(
 Rate blendedReturn(
   Account account,
   Map<Id, AssetClass> classes,
-  BandName band,
-) =>
-    _blend(account, classes)
+  BandName band, {
+  bool retired = false,
+}) =>
+    _blend(account, classes, retired: retired)
         .fold(0.0, (sum, e) => sum + e.weight * e.cls.returnFor(band));
 
 /// The share of balance paid out as distributions each year (§3.9).
-Rate blendedIncomeYield(Account account, Map<Id, AssetClass> classes) =>
-    _blend(account, classes)
+Rate blendedIncomeYield(Account account, Map<Id, AssetClass> classes,
+        {bool retired = false}) =>
+    _blend(account, classes, retired: retired)
         .fold(0.0, (sum, e) => sum + e.weight * e.cls.incomeYield);
 
 /// The portion of that yield taxed at preferential rates (§4.3.3).
@@ -43,11 +46,12 @@ Rate blendedIncomeYield(Account account, Map<Id, AssetClass> classes) =>
 /// throwing off no income contributes no dividends to qualify.
 Rate blendedQualifiedIncomeFraction(
   Account account,
-  Map<Id, AssetClass> classes,
-) {
+  Map<Id, AssetClass> classes, {
+  bool retired = false,
+}) {
   var yieldTotal = 0.0;
   var qualifiedTotal = 0.0;
-  for (final e in _blend(account, classes)) {
+  for (final e in _blend(account, classes, retired: retired)) {
     yieldTotal += e.weight * e.cls.incomeYield;
     qualifiedTotal +=
         e.weight * e.cls.incomeYield * e.cls.qualifiedIncomeFraction;
@@ -59,7 +63,8 @@ Rate blendedQualifiedIncomeFraction(
 Rate blendedAppreciation(
   Account account,
   Map<Id, AssetClass> classes,
-  BandName band,
-) =>
-    blendedReturn(account, classes, band) -
-    blendedIncomeYield(account, classes);
+  BandName band, {
+  bool retired = false,
+}) =>
+    blendedReturn(account, classes, band, retired: retired) -
+    blendedIncomeYield(account, classes, retired: retired);

@@ -6,7 +6,7 @@ class SocialSecurityBenefit {
   final Id personId;
   final Money estimatedMonthlyBenefitAtFra;
 
-  /// 62–70 whole years, per invariant 27.
+  /// 62–70 whole years, per invariant 26.
   final int claimingAge;
 
   /// Whether this person's benefit counts. Both this and the scenario-level

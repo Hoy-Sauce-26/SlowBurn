@@ -129,6 +129,7 @@ YearResult solveYear(
           wages: wages,
           year: year,
           currentYear: currentYear,
+          retirementYear: retirementYear,
           inputs: withInputs,
         ),
     ];

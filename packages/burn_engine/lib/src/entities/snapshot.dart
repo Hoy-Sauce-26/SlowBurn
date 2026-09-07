@@ -3,7 +3,7 @@ import '../types.dart';
 
 /// §3.13. A frozen record of what the plan looked like on a date.
 ///
-/// Immutable once written and never recomputed in place (invariant 19): a plan
+/// Immutable once written and never recomputed in place (invariant 18): a plan
 /// change produces a new snapshot, which is what makes §10.2's comparison
 /// mean anything.
 class ProjectionSnapshot {

@@ -53,6 +53,10 @@ enum AccountKind {
   cashChecking;
 
   String get wireName => this == education529 ? '529' : name;
+
+  /// Money in a bank rather than an investment. Every dollar of it has already
+  /// been taxed, so there is no unrealised gain in it to tax again (§6.3).
+  bool get isCash => this == cashSavings || this == cashChecking;
 }
 
 enum TaxTreatment { taxDeferred, roth, taxable, hsaTriple, educationTaxFree }
@@ -111,7 +115,15 @@ enum LiabilityKind {
 }
 
 enum MetaCategory {
+  /// Shelter itself: rent, or what is paid to have somewhere to live. The only
+  /// category that answers "do you have a roof" (§3.7), which is why the bills
+  /// that come with a roof are [housingSupport] and not this. A household
+  /// paying an electricity bill for forty years has not thereby housed itself.
   housing,
+
+  /// What a roof costs to keep: utilities, internet, property tax outside
+  /// escrow, HOA dues, renter's or contents insurance, upkeep.
+  housingSupport,
   transportation,
   food,
   health,
@@ -155,11 +167,14 @@ enum EventTaxTreatment {
   capitalGainLongTerm,
 }
 
-enum AssetClassLabel { usStocks, intlStocks, bonds, reit, cash, crypto }
+/// `cash` is money that earns nothing, a current account or a drawer. `savings`
+/// is money in a bank paying interest, which in real terms is a different
+/// holding: the same inflation erodes both, and only one is paid to offset it.
+enum AssetClassLabel { usStocks, intlStocks, bonds, reit, savings, cash, crypto }
 
 /// The fixed step vocabulary of the contribution waterfall (§4.4.4), in default
 /// order. A scenario reorders or omits, and may not drop [taxableBrokerage]
-/// (invariant 30).
+/// (invariant 29).
 enum WaterfallStep {
   matchCapture,
   hsaPayrollToLimit,

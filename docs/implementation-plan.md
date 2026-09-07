@@ -12,7 +12,7 @@ engine:
 |---|---|
 | entities | 17, carrying 192 fields |
 | formula blocks | 38 |
-| invariants | 30 |
+| invariants | 29 |
 | flags the engine can raise | 21 |
 | bundled tax-year data points | 32 |
 
@@ -72,7 +72,7 @@ teaches nothing.
 The 17 types and a `TaxYear` loaded from a bundled versioned JSON asset. No behavior.
 
 **Done when** a household can be constructed in a test and a `TaxYear` round-trips through
-its loader. The 30 invariants land here too, as a `validate()` returning findings rather
+its loader. The 29 invariants land here too, as a `validate()` returning findings rather
 than throwing, matching §12's warn-don't-block posture.
 
 ### Stage 2. One year
@@ -193,7 +193,7 @@ The ones worth building fixtures around:
 
 Beyond those: a property test that `netSurplus` reconciles against the change in net worth
 each year, and one that the fixed point converges within its pass cap for randomized
-households. The 30 invariants become a validation suite run against every fixture.
+households. The 29 invariants become a validation suite run against every fixture.
 
 `scripts/check-domain.py` keeps working on the doc throughout. When the code and the doc
 disagree, the doc is the specification and the code is wrong until a decision says otherwise.

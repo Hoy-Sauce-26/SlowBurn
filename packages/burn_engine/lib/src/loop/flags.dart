@@ -16,6 +16,7 @@ import '../pipeline/wages.dart';
 import '../taxyear/tax_year.dart';
 import '../types.dart';
 import 'amortization.dart';
+import 'housing.dart';
 
 /// Every flag the loop can raise from one year's own figures.
 ///
@@ -33,6 +34,10 @@ Set<String> yearFlags({
   required Map<Id, LiabilityState> liabilities,
   required DateTime asOfDate,
   required int year,
+
+  /// Null until §8.2 has solved one. What it changes here is whether a
+  /// phase-limited housing cost reaches this year.
+  int? retirementYear,
 }) {
   final flags = <String>{};
 
@@ -139,6 +144,14 @@ Set<String> yearFlags({
     }
   }
 
+  // Everybody lives somewhere. A year in which the household holds no home
+  // and pays nothing for housing is being projected as though shelter were
+  // free, which is the largest thing a plan can lose by omission rather than
+  // by choice: selling a house is one field, and nothing else notices (§3.7).
+  if (coversIn(household, year, retirementYear: retirementYear).isEmpty) {
+    flags.add('noHousingCost');
+  }
+
   return flags;
 }
 
@@ -192,17 +205,34 @@ Set<String> doubleCountFlags(Household household) {
   return flags;
 }
 
-/// §8.1. Whether the withdrawal rate suits the horizon it has to survive: a
-/// longer retirement needs a lower rate, and the difference is not marginal.
-bool swrHorizonMismatch(Assumptions assumptions, int retirementDurationYears) {
-  if (retirementDurationYears >= 45) {
-    return assumptions.safeWithdrawalRate > 0.035;
-  }
-  if (retirementDurationYears >= 35) {
-    return assumptions.safeWithdrawalRate > 0.04;
-  }
-  return false;
+/// §8.1. The rate a retirement of this length is usually planned on.
+///
+/// The 4% rule is an empirical finding about a **thirty-year** retirement, and
+/// it is quoted far more often than its horizon is. Someone stopping at 45 has
+/// to fund fifty years, where the same rate runs out. The ladder is coarse on
+/// purpose: the underlying studies disagree in the second decimal place, and a
+/// number carried to four would be claiming precision nobody has.
+///
+/// Not derivable from the projection's own arithmetic. The deterministic rate
+/// that empties a portfolio over N years at return r is simply 1/annuity, and
+/// at 5% real over 30 years that is 6.2%. The gap between that and 4% is the
+/// price of the order returns arrive in, which the bands cannot express
+/// (§13.1). This ladder carries the empirical answer instead.
+Rate suggestedWithdrawalRate(int retirementDurationYears) {
+  if (retirementDurationYears >= 45) return 0.035;
+  if (retirementDurationYears >= 35) return 0.040;
+  if (retirementDurationYears >= 25) return 0.045;
+  return 0.050;
 }
+
+/// Whether the withdrawal rate suits the horizon it has to survive: a longer
+/// retirement needs a lower rate, and the difference is not marginal.
+///
+/// Reads the same ladder the suggestion offers, so the app cannot recommend a
+/// rate and then flag it.
+bool swrHorizonMismatch(Assumptions assumptions, int retirementDurationYears) =>
+    assumptions.safeWithdrawalRate >
+        suggestedWithdrawalRate(retirementDurationYears);
 
 /// The vesting schedules that put a match at risk (§3.4.4).
 bool matchAtRisk(VestingSchedule? schedule) =>

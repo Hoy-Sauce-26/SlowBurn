@@ -125,6 +125,10 @@ List<Finding> validateHousehold(Household h) {
   for (final a in h.accounts) {
     final c = a.contribution;
     if (c.mode != ContributionMode.percentOfGross) continue;
+    // A share of nothing is nothing. An account nobody is paying into needs
+    // no salary behind it, and blocking on one turns a dormant plan into an
+    // error the user cannot act on.
+    if (c.value <= 0) continue;
     if (c.contributionBaseStreamIds.isEmpty) {
       report(8, Severity.blocking,
           '"${a.label}" is a percentage of nothing: no base stream named', a.id);
@@ -173,100 +177,107 @@ List<Finding> validateHousehold(Household h) {
     nonNegative('"${l.label}" payment', l.monthlyPayment, l.id);
   }
 
-  // 13. costBasis <= balance for taxable accounts at entry. Warn: losses are
-  //     real, and the engine maintains basis thereafter.
-  for (final a in h.accounts) {
-    if (a.taxTreatment == TaxTreatment.taxable &&
-        a.costBasis > a.balance) {
-      report(13, Severity.warning,
-          '"${a.label}" cost basis is above its balance, which is a loss',
-          a.id);
+  // 12b. A housing cost names a home that exists: a primaryResidence Asset or
+  //      the rent it belongs to.
+  final expenseCategories = {for (final c in h.expenseCategories) c.id: c};
+  for (final item in h.expenseItems) {
+    final home = item.housingId;
+    if (home == null) continue;
+    final isResidence = h.assets.any((a) =>
+        a.id == home && a.category == AssetCategory.primaryResidence);
+    final isRent = h.expenseItems.any((i) =>
+        i.id == home &&
+        (expenseCategories[i.categoryId]?.metaCategory) ==
+            MetaCategory.housing);
+    if (!isResidence && !isRent) {
+      report(12, Severity.blocking,
+          '"${item.label}" is attached to a home that is not there', item.id);
     }
   }
 
-  // 14. rothContributionBasis <= balance for Roth accounts.
+  // 13. rothContributionBasis <= balance for Roth accounts.
   for (final a in h.accounts) {
     if (a.taxTreatment == TaxTreatment.roth &&
         a.rothContributionBasis > a.balance) {
-      report(14, Severity.blocking,
+      report(13, Severity.blocking,
           '"${a.label}" Roth basis is above its balance', a.id);
     }
   }
 
-  // 15. escrow <= payment, and PMI <= escrow, where each is set.
+  // 14. escrow <= payment, and PMI <= escrow, where each is set.
   for (final l in h.liabilities) {
     final escrow = l.monthlyEscrowAmount;
     final pmi = l.monthlyPmiAmount;
     if (escrow != null && escrow > l.monthlyPayment) {
-      report(15, Severity.blocking,
+      report(14, Severity.blocking,
           '"${l.label}" escrow exceeds its whole payment', l.id);
     }
     if (pmi != null && escrow != null && pmi > escrow) {
-      report(15, Severity.blocking,
+      report(14, Severity.blocking,
           '"${l.label}" PMI exceeds its escrow, of which it is a part', l.id);
     }
   }
 
-  // 17. A negative OneTimeEvent must name the account it comes out of.
+  // 16. A negative OneTimeEvent must name the account it comes out of.
   for (final e in h.oneTimeEvents) {
     if (e.isOutflow && e.accountId == null) {
-      report(17, Severity.blocking,
+      report(16, Severity.blocking,
           '"${e.label}" spends money from nowhere: name the account', e.id);
     }
     if (e.accountId != null && !accountIds.contains(e.accountId)) {
-      report(26, Severity.blocking,
+      report(25, Severity.blocking,
           '"${e.label}" names an account outside this household', e.id);
     }
   }
 
-  // 18. An Asset with a planned sale must say where the proceeds land.
+  // 17. An Asset with a planned sale must say where the proceeds land.
   for (final a in h.assets) {
     if (a.plannedSaleYear == null) continue;
     if (a.saleProceedsAccountId == null) {
-      report(18, Severity.blocking,
+      report(17, Severity.blocking,
           '"${a.label}" is sold with nowhere for the proceeds to go', a.id);
     } else if (!accountIds.contains(a.saleProceedsAccountId)) {
-      report(26, Severity.blocking,
+      report(25, Severity.blocking,
           '"${a.label}" sends proceeds outside this household', a.id);
     }
   }
 
-  // 22. Depreciation cannot exceed the depreciable basis, and is zero outside
+  // 21. Depreciation cannot exceed the depreciable basis, and is zero outside
   //     investment property.
   for (final a in h.assets) {
     if (a.category == AssetCategory.investmentProperty) {
       final depreciable = a.costBasis * (1 - a.landFraction);
       if (a.accumulatedDepreciation > depreciable) {
-        report(22, Severity.blocking,
+        report(21, Severity.blocking,
             '"${a.label}" has depreciated past its depreciable basis', a.id);
       }
     } else if (!a.accumulatedDepreciation.isZero) {
-      report(22, Severity.warning,
+      report(21, Severity.warning,
           '"${a.label}" carries depreciation but is not a rental', a.id);
     }
   }
 
-  // 23. A dependent's support cannot end before they are born.
+  // 22. A dependent's support cannot end before they are born.
   for (final t in h.taxUnits) {
     for (final d in t.dependents) {
       if (d.resolvedSupportEndYear < d.birthDate.year) {
-        report(23, Severity.blocking,
+        report(22, Severity.blocking,
             'a dependent stops being supported before they are born', t.id);
       }
     }
   }
 
-  // 25. Attribution is required once a household holds more than one TaxUnit,
+  // 24. Attribution is required once a household holds more than one TaxUnit,
   //     since §4.3's sums are per TaxUnit and an unattributed one reaches both.
   if (h.taxUnits.length > 1) {
     void needsPerson(String kind, String label, Id? personId, String id) {
       if (personId == null) {
-        report(25, Severity.blocking,
+        report(24, Severity.blocking,
             '$kind "$label" is unattributed, and this household files two '
             'returns',
             id);
       } else if (!personIds.contains(personId)) {
-        report(25, Severity.blocking,
+        report(24, Severity.blocking,
             '$kind "$label" names someone outside this household', id);
       }
     }
@@ -281,16 +292,16 @@ List<Finding> validateHousehold(Household h) {
     }
   }
 
-  // 26. A named Employer belongs to this household.
+  // 25. A named Employer belongs to this household.
   for (final s in h.incomeStreams) {
     if (s.employerId != null && !employerIds.contains(s.employerId)) {
-      report(26, Severity.blocking,
+      report(25, Severity.blocking,
           '"${s.label}" names an employer outside this household', s.id);
     }
   }
   for (final a in h.accounts) {
     if (a.employerId != null && !employerIds.contains(a.employerId)) {
-      report(26, Severity.blocking,
+      report(25, Severity.blocking,
           '"${a.label}" names an employer outside this household', a.id);
     }
   }
@@ -300,29 +311,29 @@ List<Finding> validateHousehold(Household h) {
   for (final d in h.payrollDeductions) {
     if (d.expenseCategoryId != null &&
         !categoryIds.contains(d.expenseCategoryId)) {
-      report(26, Severity.blocking,
+      report(25, Severity.blocking,
           '"${d.label}" names a category outside this household', d.id);
     }
   }
 
-  // 27. Claiming age is in [62, 70].
+  // 26. Claiming age is in [62, 70].
   for (final p in h.people) {
     final ss = p.socialSecurity;
     if (ss == null) continue;
     if (ss.claimingAge < 62 || ss.claimingAge > 70) {
-      report(27, Severity.blocking,
+      report(26, Severity.blocking,
           '${p.displayName} claims Social Security at ${ss.claimingAge}, '
           'outside 62 to 70',
           p.id);
     }
   }
 
-  // 29. A roth or taxDeferred account has a limit family other than none.
+  // 28. A roth or taxDeferred account has a limit family other than none.
   for (final a in h.accounts) {
     final treated = a.taxTreatment == TaxTreatment.roth ||
         a.taxTreatment == TaxTreatment.taxDeferred;
     if (treated && a.limitFamily == LimitFamily.none) {
-      report(29, Severity.blocking,
+      report(28, Severity.blocking,
           '"${a.label}" is tax-advantaged and uncapped, so it could take '
           'unlimited contributions',
           a.id);
@@ -332,16 +343,16 @@ List<Finding> validateHousehold(Household h) {
   return findings;
 }
 
-/// §12's assumption-level invariants, 28 and 30.
+/// §12's assumption-level invariants, 27 and 29.
 List<Finding> validateAssumptions(Assumptions a) {
   final findings = <Finding>[];
   if (a.safeWithdrawalRate <= 0) {
-    findings.add(const Finding(28, Severity.blocking,
+    findings.add(const Finding(27, Severity.blocking,
         'the safe withdrawal rate must be above zero: §8.1 divides by it'));
   }
   if (!a.contributionWaterfall.contains(WaterfallStep.taxableBrokerage)) {
     findings.add(const Finding(
-        30,
+        29,
         Severity.blocking,
         'the waterfall has no taxableBrokerage step, so a surplus would have '
         'nowhere to land'));

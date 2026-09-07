@@ -102,7 +102,7 @@ void main() {
       expect(steps, isNot(contains(WaterfallStep.iraToLimit)));
       expect(steps, isNot(contains(WaterfallStep.matchCapture)));
       expect(steps, contains(WaterfallStep.taxableBrokerage),
-          reason: 'invariant 30: the surplus still needs somewhere to land');
+          reason: 'invariant 29: the surplus still needs somewhere to land');
     });
 
     test('the resulting scenario is valid', () {

@@ -35,7 +35,7 @@ class IncomeScreen extends ConsumerWidget {
           blurb: 'Naming an employer lets us tie a job to the retirement plan '
               'it sponsors, which is how an employer match is worked out.',
           addLabel: 'Add an employer',
-          onAdd: canAdd ? () => _editEmployer(context, ref, null) : null,
+          onAdd: canAdd ? () => editEmployer(context, ref, null) : null,
           emptyMessage: canAdd
               ? 'Optional. Add one if your job comes with a 401(k) match.'
               : null,
@@ -45,7 +45,7 @@ class IncomeScreen extends ConsumerWidget {
                 icon: Icons.business_outlined,
                 title: employer.label,
                 subtitle: _employerSummary(employer, household),
-                onTap: () => _editEmployer(context, ref, employer),
+                onTap: () => editEmployer(context, ref, employer),
                 onDelete: () => notifier.removeEmployer(employer.id),
               ),
           ],
@@ -53,7 +53,7 @@ class IncomeScreen extends ConsumerWidget {
         EntitySection(
           title: 'Income',
           addLabel: 'Add income',
-          onAdd: canAdd ? () => _edit(context, ref, null) : null,
+          onAdd: canAdd ? () => editIncome(context, ref, null) : null,
           emptyMessage: canAdd
               ? 'Nothing yet. Earned income stops at retirement; a pension or '
                   'a rental does not.'
@@ -69,7 +69,7 @@ class IncomeScreen extends ConsumerWidget {
                 title: stream.label,
                 subtitle: _describe(stream, household),
                 trailing: formatMoneyCompact(stream.grossAnnualAmount),
-                onTap: () => _edit(context, ref, stream),
+                onTap: () => editIncome(context, ref, stream),
                 onDelete: () => notifier.removeIncomeStream(stream.id),
               ),
           ],
@@ -79,7 +79,7 @@ class IncomeScreen extends ConsumerWidget {
           blurb: 'Money that never reaches your bank account: health premiums, '
               'an FSA, a commuter benefit.',
           addLabel: 'Add a payroll deduction',
-          onAdd: canAdd ? () => _editDeduction(context, ref, null) : null,
+          onAdd: canAdd ? () => editDeduction(context, ref, null) : null,
           emptyMessage: canAdd ? 'Nothing yet.' : null,
           children: [
             for (final deduction in household.payrollDeductions)
@@ -88,7 +88,7 @@ class IncomeScreen extends ConsumerWidget {
                 title: deduction.label,
                 subtitle: _describeDeduction(deduction, household),
                 trailing: formatMoneyCompact(deduction.annualAmount),
-                onTap: () => _editDeduction(context, ref, deduction),
+                onTap: () => editDeduction(context, ref, deduction),
                 onDelete: () => notifier.removePayrollDeduction(deduction.id),
               ),
           ],
@@ -126,7 +126,7 @@ class IncomeScreen extends ConsumerWidget {
     return 'Linked to ${parts.join(' and ')}';
   }
 
-  Future<void> _editEmployer(
+  Future<void> editEmployer(
       BuildContext context, WidgetRef ref, Employer? existing) async {
     final household = ref.read(householdProvider);
     final notifier = ref.read(householdProvider.notifier);
@@ -163,7 +163,7 @@ class IncomeScreen extends ConsumerWidget {
   }
 
   /// §3.4.5. Pre-tax money that is spent rather than saved.
-  Future<void> _editDeduction(
+  Future<void> editDeduction(
       BuildContext context, WidgetRef ref, PayrollDeduction? existing) async {
     final household = ref.read(householdProvider);
     final notifier = ref.read(householdProvider.notifier);
@@ -181,7 +181,7 @@ class IncomeScreen extends ConsumerWidget {
       build: (context) => StatefulBuilder(
         builder: (context, setState) => Column(
           children: [
-            _Note(
+            Note(
               'This is for money that is spent, not saved: a health premium, '
               'an FSA, a transit pass. It comes out before tax, and whatever '
               'is left at the end of the year is gone.\n\n'
@@ -238,7 +238,7 @@ class IncomeScreen extends ConsumerWidget {
               onChanged: (v) => label = v,
             ),
             const SizedBox(height: 4),
-            _Note('Left blank, this will be called '
+            Note('Left blank, this will be called '
                 '"${_defaultDeductionLabel(household, personId, kind)}".'),
             const SizedBox(height: 16),
             Align(
@@ -283,7 +283,7 @@ class IncomeScreen extends ConsumerWidget {
     return '$owner · ${humanise(s.kind.name)} · $span';
   }
 
-  Future<void> _edit(
+  Future<void> editIncome(
       BuildContext context, WidgetRef ref, IncomeStream? existing) async {
     final household = ref.read(householdProvider);
     final notifier = ref.read(householdProvider.notifier);
@@ -405,7 +405,7 @@ class IncomeScreen extends ConsumerWidget {
               onChanged: (v) => label = v,
             ),
             const SizedBox(height: 4),
-            _Note('Left blank, this will be called '
+            Note('Left blank, this will be called '
                 '"${_defaultIncomeLabel(household, personId, employerId, kind)}".'),
             const SizedBox(height: 16),
             Align(
@@ -469,32 +469,6 @@ String _defaultDeductionLabel(
     PayrollDeductionKind.other => 'payroll deduction',
   };
   return name == null ? humanise(what) : "$name's $what";
-}
-
-/// A short aside, for the things a form label has no room to say.
-class _Note extends StatelessWidget {
-  final String text;
-  const _Note(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(Icons.info_outline,
-            size: 16, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 /// "Alex at Acme", or "Alex's salary" where no employer is named. A label

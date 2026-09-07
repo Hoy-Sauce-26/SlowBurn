@@ -1,6 +1,7 @@
 import 'package:burn_engine/burn_engine.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'readiness.dart';
 import 'tax_year_service.dart';
 
 /// The app's wiring. Every screen reads the projection through here rather than
@@ -12,6 +13,29 @@ final taxYearServiceProvider = Provider<TaxYearService>((_) => TaxYearService())
 
 final taxYearProvider = FutureProvider<TaxYear>((ref) =>
     ref.watch(taxYearServiceProvider).load(TaxYearService.defaultTaxYearId));
+
+/// How far through setup the household is, and whether its owner has said they
+/// are ready to see numbers. Persisted beside the plan rather than inside it.
+final setupProgressProvider =
+    NotifierProvider<SetupProgressNotifier, SetupProgress>(
+        SetupProgressNotifier.new);
+
+class SetupProgressNotifier extends Notifier<SetupProgress> {
+  @override
+  SetupProgress build() => const SetupProgress();
+
+  void replace(SetupProgress progress) => state = progress;
+
+  /// "I have none of these" is an answer, and it is reversible: entering
+  /// something later simply overtakes it.
+  void pass(SetupStep step) =>
+      state = state.copyWith(passed: {...state.passed, step});
+
+  void unpass(SetupStep step) =>
+      state = state.copyWith(passed: {...state.passed}..remove(step));
+
+  void declareReady() => state = state.copyWith(declaredReady: true);
+}
 
 /// The household under edit. Replaced wholesale on every change, since the
 /// entities are immutable and the engine takes the whole thing anyway.
@@ -80,8 +104,15 @@ class HouseholdNotifier extends Notifier<Household> {
   void removeCategory(Id id) => state = state.copyWith(
       expenseCategories: _without(state.expenseCategories, id, (e) => e.id));
 
-  void saveExpenseItem(ExpenseItem i) => state = state.copyWith(
-      expenseItems: _upsert(state.expenseItems, i, (e) => e.id));
+  void saveExpenseItem(ExpenseItem i) {
+    final items = _upsert(state.expenseItems, i, (e) => e.id);
+    // A cost tied to this rent follows it. Doing this here rather than in the
+    // editor means it holds however the rent was changed.
+    state = state.copyWith(
+      expenseItems:
+          _followHome(items, homeId: i.id, from: i.startYear, to: i.endYear),
+    );
+  }
   void removeExpenseItem(Id id) => state = state.copyWith(
       expenseItems: _without(state.expenseItems, id, (e) => e.id));
 
@@ -100,11 +131,56 @@ class HouseholdNotifier extends Notifier<Household> {
   void removeOneTimeEvent(Id id) => state = state.copyWith(
       oneTimeEvents: _without(state.oneTimeEvents, id, (x) => x.id));
 
-  void saveAsset(Asset a) =>
-      state = state.copyWith(assets: _upsert(state.assets, a, (e) => e.id));
+  void saveAsset(Asset a) {
+    state = state.copyWith(
+      assets: _upsert(state.assets, a, (e) => e.id),
+      // Sell the house in 2046 and its tax and dues end in 2045 with it.
+      expenseItems: _followHome(
+        state.expenseItems,
+        homeId: a.id,
+        from: a.acquisitionYear,
+        to: a.plannedSaleYear == null ? null : a.plannedSaleYear! - 1,
+      ),
+    );
+  }
   void removeAsset(Id id) =>
       state = state.copyWith(assets: _without(state.assets, id, (e) => e.id));
 }
+
+/// Re-dates every cost attached to a home, so a roof and its bills cannot
+/// disagree about when they end.
+///
+/// Unconditional on purpose. Attaching a cost to a home is the statement that
+/// it runs with that home, so a date that no longer matches is stale rather
+/// than deliberate; anything meant to outlive the house is left unattached.
+List<ExpenseItem> _followHome(
+  List<ExpenseItem> items, {
+  required Id homeId,
+  required int? from,
+  required int? to,
+}) =>
+    [
+      for (final item in items)
+        if (item.housingId != homeId ||
+            (item.startYear == from && item.endYear == to))
+          item
+        else
+          ExpenseItem(
+            id: item.id,
+            categoryId: item.categoryId,
+            label: item.label,
+            amount: item.amount,
+            frequency: item.frequency,
+            startYear: from,
+            endYear: to,
+            startMonth: item.startMonth,
+            endMonth: item.endMonth,
+            relativeInflationRate: item.relativeInflationRate,
+            phase: item.phase,
+            postRetirementAmount: item.postRetirementAmount,
+            housingId: item.housingId,
+          ),
+    ];
 
 /// A fresh id. Local-only storage means nothing has to coordinate these, so
 /// time plus a counter is enough and reads better in an export than a uuid.
@@ -138,46 +214,20 @@ final assetClassesProvider =
 
 class AssetClassesNotifier extends Notifier<List<AssetClass>> {
   @override
-  List<AssetClass> build() => const [
-        AssetClass(
-          id: 'usStocks',
-          label: AssetClassLabel.usStocks,
-          expectedRealReturn: 0.05,
-          pessimisticRealReturn: 0.02,
-          optimisticRealReturn: 0.08,
-          incomeYield: 0.013,
-          qualifiedIncomeFraction: 1.0,
-        ),
-        AssetClass(
-          id: 'intlStocks',
-          label: AssetClassLabel.intlStocks,
-          expectedRealReturn: 0.045,
-          pessimisticRealReturn: 0.015,
-          optimisticRealReturn: 0.075,
-          incomeYield: 0.026,
-          qualifiedIncomeFraction: 0.7,
-        ),
-        AssetClass(
-          id: 'bonds',
-          label: AssetClassLabel.bonds,
-          expectedRealReturn: 0.02,
-          pessimisticRealReturn: 0.0,
-          optimisticRealReturn: 0.03,
-          incomeYield: 0.035,
-          qualifiedIncomeFraction: 0.0,
-        ),
-        AssetClass(
-          id: 'cash',
-          label: AssetClassLabel.cash,
-          expectedRealReturn: 0.0,
-          pessimisticRealReturn: -0.01,
-          optimisticRealReturn: 0.01,
-          incomeYield: 0.02,
-          qualifiedIncomeFraction: 0.0,
-        ),
-      ];
+  List<AssetClass> build() => defaults;
 
-  void replace(List<AssetClass> classes) => state = classes;
+  /// A plan saved before a class existed comes back without it, and the field
+  /// that offers it would then fall back to whatever sorts first. Stored
+  /// classes win where they overlap, and the rest are added.
+  void replace(List<AssetClass> classes) {
+    final have = classes.map((c) => c.id).toSet();
+    state = [
+      ...classes,
+      ...defaults.where((c) => !have.contains(c.id)),
+    ];
+  }
+
+  static const defaults = AssetClass.defaults;
 }
 
 /// Everything §12 found wrong with the household as entered. Warn-don't-block,
@@ -199,11 +249,20 @@ final projectionProvider = Provider<AsyncValue<Band<BandResult>>>((ref) {
   final classes = ref.watch(assetClassesProvider);
   final findings = ref.watch(findingsProvider);
 
+  final setup = ref.watch(setupProgressProvider);
+
   return taxYear.whenData((year) {
     // A household the engine cannot run on gets an empty result rather than a
     // wrong one; the findings say why.
     if (findings.hasBlocking || household.people.isEmpty) {
       throw const ProjectionNotRunnable();
+    }
+    // And a half-entered one gets nothing at all. The engine answers whatever
+    // it is asked, so a plan with a salary and no spending yields a confident
+    // retirement year that is a decade early. Nothing computes until the
+    // person says the plan is ready to be read.
+    if (!setup.showsProjection(household)) {
+      throw const ProjectionNotReady();
     }
     return solveAllBands(
       household,
@@ -214,6 +273,13 @@ final projectionProvider = Provider<AsyncValue<Band<BandResult>>>((ref) {
     );
   });
 });
+
+/// Why no projection is being shown: the plan is still being written.
+class ProjectionNotReady implements Exception {
+  const ProjectionNotReady();
+  @override
+  String toString() => 'the plan is not ready to be read yet';
+}
 
 /// Why no projection is being shown, as distinct from one that failed.
 class ProjectionNotRunnable implements Exception {

@@ -6,6 +6,7 @@ library;
 
 import '../entities/assumptions.dart';
 import '../entities/household.dart';
+import '../loop/housing.dart';
 import '../enums.dart';
 import '../types.dart';
 import 'federal_tax.dart';
@@ -84,6 +85,12 @@ CashFlow computeCashFlow(
 
   final categories = {for (final c in household.expenseCategories) c.id: c};
   final expenseItemTotal = sumMoney(household.expenseItems.map((item) {
+    // The tax and dues on a house stop when the house is sold. Left running,
+    // a plan pays forty years of upkeep on somewhere it no longer owns (§3.7).
+    if (!housingCostStandsIn(household, item, year,
+        retirementYear: retirementYear)) {
+      return Money.zero;
+    }
     final category = categories[item.categoryId];
     return item.amountIn(
       year,

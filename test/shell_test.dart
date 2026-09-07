@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slow_burn/screens/home_shell.dart';
 import 'package:slow_burn/services/providers.dart';
+import 'package:slow_burn/services/readiness.dart';
 import 'package:slow_burn/theme/app_theme.dart';
 import 'package:slow_burn/widgets/results_panel.dart';
 
@@ -83,6 +84,7 @@ Future<void> pumpShell(
   WidgetTester tester, {
   required Size size,
   Household? household,
+  bool ready = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -94,6 +96,8 @@ Future<void> pumpShell(
         taxYearProvider.overrideWith((ref) => taxYear),
         if (household != null)
           householdProvider.overrideWith(() => _FixedHousehold(household)),
+        if (ready)
+          setupProgressProvider.overrideWith(() => _Declared()),
       ],
       child: MaterialApp(theme: lightTheme(), home: const HomeShell()),
     ),
@@ -102,6 +106,12 @@ Future<void> pumpShell(
   // never settles. One extra frame is enough now that the tax year is supplied
   // rather than loaded.
   await tester.pump();
+}
+
+/// A household whose owner has been through setup and asked to see numbers.
+class _Declared extends SetupProgressNotifier {
+  @override
+  SetupProgress build() => const SetupProgress(declaredReady: true);
 }
 
 class _FixedHousehold extends HouseholdNotifier {
@@ -134,10 +144,22 @@ void main() {
     expect(find.text('Results'), findsWidgets);
   });
 
-  testWidgets('an empty household says so rather than showing a blank',
-      (tester) async {
+  testWidgets('an empty household shows what it still needs', (tester) async {
     await pumpShell(tester, size: const Size(1440, 900));
-    expect(find.text('No projection yet'), findsOneWidget);
+    expect(find.text('Building your plan'), findsOneWidget);
+    expect(find.text('0 of 7'), findsOneWidget);
+    expect(find.text('Who the plan covers'), findsOneWidget);
+    expect(find.text('What a year costs'), findsOneWidget);
+  });
+
+  testWidgets('a plan that has everything but a declaration shows no numbers',
+      (tester) async {
+    // The state that produced a retirement year eleven years early: enough
+    // entered to look complete, and nobody has said it is ready to read.
+    await pumpShell(tester, size: const Size(1440, 1200), household: funded());
+    expect(find.text('Retirement year'), findsNothing);
+    expect(find.text('FIRE number'), findsNothing);
+    expect(find.text('Building your plan'), findsOneWidget);
   });
 
   testWidgets('a funded household shows the three headlines', (tester) async {
@@ -145,7 +167,11 @@ void main() {
       tester,
       size: const Size(1440, 1200),
       household: funded(),
+      ready: true,
     );
+    // Away from Plan, which shows headlines of its own, so this is the panel.
+    await tester.tap(find.text('Household').first);
+    await tester.pump();
     expect(find.text('Retirement year'), findsOneWidget);
     expect(find.text('FIRE number'), findsOneWidget);
     expect(find.text('Sustainable spending'), findsOneWidget);

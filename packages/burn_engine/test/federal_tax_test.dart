@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:burn_engine/burn_engine.dart';
@@ -9,22 +10,33 @@ final taxYear =
     parseTaxYear(File('../../assets/tax_years/2026.json').readAsStringSync());
 const year = 2026;
 
+/// The bundled ruleset with one state rewritten, for the rules no bundled
+/// state exercises yet.
+TaxYear taxYearWithState(String code, Map<String, dynamic> rules) {
+  final j = jsonDecode(File('../../assets/tax_years/2026.json')
+      .readAsStringSync()) as Map<String, dynamic>;
+  (j['stateRules'] as Map<String, dynamic>)[code] = rules;
+  return taxYearFromJson(j);
+}
+
 ({TaxableIncome income, TaxOwed owed}) run(
   Household h, {
   Assumptions? assumptions,
   YearInputs inputs = const YearInputs(),
   WithdrawalPenalties penalties = const WithdrawalPenalties(),
+  TaxYear? using,
 }) {
   final a = assumptions ?? const Assumptions(taxYearId: 'us-2026');
+  final ty = using ?? taxYear;
   final wages = h.people
       .map((p) => computeWages(p,
-          household: h, taxYear: taxYear, year: year, currentYear: year))
+          household: h, taxYear: ty, year: year, currentYear: year))
       .toList();
   final unit = h.taxUnits.first;
   final income = computeTaxableIncome(unit,
       household: h,
       assumptions: a,
-      taxYear: taxYear,
+      taxYear: ty,
       assetClasses: assetClasses(),
       wages: wages,
       year: year,
@@ -35,7 +47,7 @@ const year = 2026;
       income: income,
       wages: wages,
       assumptions: a,
-      taxYear: taxYear,
+      taxYear: ty,
       year: year,
       currentYear: year,
       inputs: inputs,
@@ -221,6 +233,21 @@ void main() {
           poor.owed.health.premiumTaxCredit, isTrue);
     });
 
+    test('a dollar over four times the poverty line costs the whole credit',
+        () {
+      // The enhanced credits lapsed after 2025, so 2026 brings back the cliff.
+      // A bridge plan that lands just over it loses every dollar of subsidy,
+      // which is the single most expensive mistake this app can help avoid.
+      final under = run(retiree(draw: 62000, coverageEnd: 2020));
+      final over = run(retiree(draw: 66000, coverageEnd: 2020));
+
+      expect(under.owed.health.fplPercent, lessThan(400));
+      expect(over.owed.health.fplPercent, greaterThan(400));
+      expect(under.owed.health.premiumTaxCredit.isPositive, isTrue);
+      expect(over.owed.health.eligible, isFalse);
+      expect(over.owed.health.premiumTaxCredit, Money.zero);
+    });
+
     test('acaMagi adds back the untaxed half of a benefit', () {
       final h = Household(
         id: 'h1',
@@ -285,6 +312,71 @@ void main() {
 
       expect(owed(FilingStatus.marriedFilingJointly).cents,
           lessThan(owed(FilingStatus.single).cents));
+    });
+
+    test('a personal credit comes off the tax, not off income', () {
+      // Six states hand out a flat credit where others give an exemption.
+      final h = Household(
+        id: 'h1',
+        taxUnits: [taxUnit(state: 'CA')],
+        people: [person()],
+        incomeStreams: [salary(pay: 150000)],
+      );
+      final withCredit = run(h).owed.stateTax;
+      final without = run(h,
+              using: taxYearWithState('CA', {
+                'brackets': {
+                  'single': [
+                    {'upTo': null, 'rate': 0.093}
+                  ]
+                },
+                'standardDeduction': 554000,
+              }))
+          .owed.stateTax;
+      expect(withCredit.isPositive, isTrue);
+      expect(without - withCredit, isNot(Money.zero));
+    });
+
+    test('a credit cannot push a state refund', () {
+      final h = Household(
+        id: 'h1',
+        taxUnits: [taxUnit(state: 'ZZ')],
+        people: [person()],
+        incomeStreams: [salary(pay: 20000)],
+      );
+      final owed = run(h,
+          using: taxYearWithState('ZZ', {
+            'flatRate': 0.01,
+            'personalCredit': 500000,
+          })).owed.stateTax;
+      expect(owed, Money.zero,
+          reason: 'a \$5,000 credit against \$140 of tax stops at zero');
+    });
+
+    test('a retirement exclusion shelters retirement income and no more', () {
+      // Illinois and Pennsylvania exempt retirement income almost entirely.
+      // Subtracting that from a salary would exempt the salary too.
+      Household earning({required int pay}) => Household(
+            id: 'h1',
+            taxUnits: [taxUnit(state: 'ZZ')],
+            people: [person()],
+            incomeStreams: [salary(pay: pay)],
+          );
+      final generous = taxYearWithState('ZZ', {
+        'flatRate': 0.05,
+        'retirementIncomeExclusion': 10000000,
+      });
+
+      final worker = run(earning(pay: 100000), using: generous);
+      expect(worker.owed.stateTax.isPositive, isTrue,
+          reason: 'wages are not retirement income');
+
+      final retiree = run(earning(pay: 0),
+          using: generous,
+          inputs: YearInputs(rmdIncome: Money.dollars(60000)));
+      expect(retiree.owed.stateTax, Money.zero,
+          reason: 'a hundred thousand of exclusion covers a sixty thousand '
+              'dollar pension draw');
     });
 
     test('a non-conforming state adds pre-tax deferrals back', () {

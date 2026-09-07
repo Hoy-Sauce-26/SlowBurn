@@ -143,6 +143,6 @@ class Household {
 
   /// Where an unattributed `Asset`, `Liability` or `OneTimeEvent` lands: the
   /// household\'s only tax unit, which exists only while there is exactly one
-  /// (invariant 25).
+  /// (invariant 24).
   TaxUnit? get soleTaxUnit => taxUnits.length == 1 ? taxUnits.first : null;
 }

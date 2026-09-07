@@ -22,7 +22,45 @@ AccountState rothWith({num balance = 100000, num basis = 40000}) =>
           const Contribution(mode: ContributionMode.fixedAmount, value: 0),
     ));
 
+AccountState cashWith({num balance = 40000, num basis = 0}) =>
+    AccountState(Account(
+      id: 'savings',
+      personId: 'p1',
+      label: 'Savings',
+      kind: AccountKind.cashSavings,
+      taxTreatment: TaxTreatment.taxable,
+      limitFamily: LimitFamily.none,
+      balance: Money.dollars(balance),
+      costBasis: Money.dollars(basis),
+      isRestrictedPurpose: false,
+      assetAllocationId: 'cash',
+      contribution:
+          const Contribution(mode: ContributionMode.fixedAmount, value: 0),
+    ));
+
 void main() {
+  group('§6.3 a bank balance is all after-tax dollars', () {
+    test('savings opens at full basis whatever was entered', () {
+      // Nobody entering a savings balance thinks to enter a basis for it, and
+      // a zero would tax the whole withdrawal as gain.
+      final savings = cashWith(balance: 40000, basis: 0);
+      expect(savings.costBasis, Money.dollars(40000));
+      expect(savings.unrealizedGain, Money.zero);
+      expect(savings.gainPortionOf(Money.dollars(40000)), Money.zero);
+    });
+
+    test('an entered basis larger than the balance is left alone', () {
+      expect(cashWith(balance: 40000, basis: 45000).costBasis,
+          Money.dollars(45000));
+    });
+
+    test('a brokerage still carries real gain', () {
+      // The rule is about bank accounts, not about taxable accounts generally.
+      expect(taxableWith(balance: 100000, basis: 60000).unrealizedGain,
+          Money.dollars(40000));
+    });
+  });
+
   group('§6.3 the basis denominator', () {
     test('a draw takes basis at the ratio it actually saw', () {
       // The rule this whole test file exists for. $40,000 out of $100,000 is

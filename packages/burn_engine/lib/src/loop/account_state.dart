@@ -32,7 +32,12 @@ class AccountState {
 
   AccountState(this.account)
       : balance = account.balance,
-        costBasis = account.costBasis,
+        // A bank balance is all after-tax dollars, whatever was entered for
+        // it. Left as a zero basis, drawing $40,000 from savings would be
+        // taxed as though every dollar were gain (§6.3).
+        costBasis = account.kind.isCash
+            ? maxMoney(account.costBasis, account.balance)
+            : account.costBasis,
         rothContributionBasis = account.rothContributionBasis;
 
   Id get id => account.id;
@@ -133,8 +138,9 @@ class AccountState {
     required Map<Id, AssetClass> assetClasses,
     required BandName band,
     required double frac,
+    bool retired = false,
   }) {
-    final r = blendedReturn(account, assetClasses, band);
+    final r = blendedReturn(account, assetClasses, band, retired: retired);
     final opening = balance - _netFlows;
     final grown = opening * math.pow(1 + r, frac) +
         _netFlows * math.pow(1 + r, frac / 2);

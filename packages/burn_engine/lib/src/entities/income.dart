@@ -5,7 +5,7 @@ import '../types.dart';
 import 'spanned.dart';
 
 /// §3.3. A label two entities can point at, so an `IncomeStream` and an
-/// `Account` can be checked for naming the same one (invariant 26).
+/// `Account` can be checked for naming the same one (invariant 25).
 class Employer {
   final Id id;
   final Id householdId;

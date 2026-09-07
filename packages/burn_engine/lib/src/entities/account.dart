@@ -66,7 +66,7 @@ class Contribution with Spanned {
   final ContributionMode mode;
 
   /// A decimal rate under [ContributionMode.percentOfGross], dollars under
-  /// [ContributionMode.fixedAmount] (invariant 23).
+  /// [ContributionMode.fixedAmount] (invariant 22).
   final double value;
 
   /// Which of the person's streams the percentage applies to. Required when
@@ -172,8 +172,67 @@ class Account {
     this.employerId,
     this.allocationMode = AllocationMode.singleClass,
     this.assetAllocationId,
+    this.retirementAllocationId,
     this.allocationWeights = const [],
     required this.isRestrictedPurpose,
     this.targetBalanceMonths,
   });
+
+  /// What this is moved into once the household retires, and null where it
+  /// stays where it is.
+  ///
+  /// A portfolio that carries somebody to retirement is rarely the one they
+  /// live off afterwards: selling shares into a bad year is what forces people
+  /// back to work, and the usual answer is to hold less of them. Without this
+  /// the projection earns an accumulation return through a forty-year
+  /// decumulation and says a plan lasts longer than it will (§3.9).
+  final Id? retirementAllocationId;
+
+  /// The allocation in force in a given year.
+  Id? allocationIn({required bool retired}) =>
+      retired ? (retirementAllocationId ?? assetAllocationId) : assetAllocationId;
+
+  /// The same account, moved into something else at retirement.
+  Account withRetirementAllocation(Id? classId) => Account(
+        id: id,
+        personId: personId,
+        label: label,
+        kind: kind,
+        taxTreatment: taxTreatment,
+        limitFamily: limitFamily,
+        balance: balance,
+        costBasis: costBasis,
+        rothContributionBasis: rothContributionBasis,
+        rothFirstContributionYear: rothFirstContributionYear,
+        contribution: contribution,
+        employerId: employerId,
+        allocationMode: allocationMode,
+        assetAllocationId: assetAllocationId,
+        retirementAllocationId: classId,
+        allocationWeights: allocationWeights,
+        isRestrictedPurpose: isRestrictedPurpose,
+        targetBalanceMonths: targetBalanceMonths,
+      );
+
+  /// The same account, held in something else.
+  Account withAllocation(Id classId) => Account(
+        id: id,
+        personId: personId,
+        label: label,
+        kind: kind,
+        taxTreatment: taxTreatment,
+        limitFamily: limitFamily,
+        balance: balance,
+        costBasis: costBasis,
+        rothContributionBasis: rothContributionBasis,
+        rothFirstContributionYear: rothFirstContributionYear,
+        contribution: contribution,
+        employerId: employerId,
+        allocationMode: allocationMode,
+        assetAllocationId: classId,
+        retirementAllocationId: retirementAllocationId,
+        allocationWeights: allocationWeights,
+        isRestrictedPurpose: isRestrictedPurpose,
+        targetBalanceMonths: targetBalanceMonths,
+      );
 }

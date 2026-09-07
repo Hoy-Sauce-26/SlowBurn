@@ -53,6 +53,16 @@ class ExpenseItem with Spanned {
   /// For `both` items whose amount changes at retirement.
   final Money? postRetirementAmount;
 
+  /// For a `housingSupport` item: the home it belongs to, naming either a
+  /// `primaryResidence` `Asset` or the `housing` `ExpenseItem` that is the
+  /// rent (§3.7).
+  ///
+  /// Property tax, HOA dues and home insurance are costs of a particular
+  /// roof, and they stop when it does. Left unnamed they run on their own
+  /// dates, which is how somebody whose bills outlive a house says so
+  /// deliberately rather than by omission.
+  final Id? housingId;
+
   const ExpenseItem({
     required this.id,
     required this.categoryId,
@@ -66,6 +76,7 @@ class ExpenseItem with Spanned {
     this.relativeInflationRate,
     this.phase = ExpensePhase.both,
     this.postRetirementAmount,
+    this.housingId,
   });
 
   /// Whether this line is spent in [year], given the household's retirement

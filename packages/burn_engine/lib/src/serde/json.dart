@@ -179,6 +179,7 @@ Map<String, dynamic> _account(Account a) => {
       'employerId': a.employerId,
       'allocationMode': a.allocationMode.name,
       'assetAllocationId': a.assetAllocationId,
+      'retirementAllocationId': a.retirementAllocationId,
       'allocationWeights': a.allocationWeights
           .map((w) => {'assetClassId': w.assetClassId, 'weight': w.weight})
           .toList(),
@@ -300,6 +301,7 @@ Map<String, dynamic> _item(ExpenseItem i) => {
       'relativeInflationRate': i.relativeInflationRate,
       'phase': i.phase.name,
       'postRetirementAmount': _cn(i.postRetirementAmount),
+      'housingId': i.housingId,
     };
 
 Map<String, dynamic> _event(OneTimeEvent e) => {
@@ -334,6 +336,10 @@ Map<String, dynamic> _assumptions(Assumptions a) => {
       'acaMagiCeilingPercentOfFpl': a.acaMagiCeilingPercentOfFpl,
       'pmiTerminationLtv': a.pmiTerminationLtv,
       'assetSaleCostRate': a.assetSaleCostRate,
+      'assetAppreciationByCategory': {
+        for (final e in a.assetAppreciationByCategory.entries)
+          e.key.name: e.value,
+      },
       'taxYearId': a.taxYearId,
     };
 
@@ -486,6 +492,7 @@ Account _readAccount(Map<String, dynamic> j) {
     employerId: j['employerId'] as String?,
     allocationMode: _enum(AllocationMode.values, j['allocationMode']),
     assetAllocationId: j['assetAllocationId'] as String?,
+    retirementAllocationId: j['retirementAllocationId'] as String?,
     allocationWeights: _list(j['allocationWeights'])
         .map((w) => AllocationWeight(
               assetClassId: w['assetClassId'] as String,
@@ -617,6 +624,7 @@ ExpenseItem _readItem(Map<String, dynamic> j) => ExpenseItem(
       relativeInflationRate: (j['relativeInflationRate'] as num?)?.toDouble(),
       phase: _enum(ExpensePhase.values, j['phase']),
       postRetirementAmount: _mn(j['postRetirementAmount']),
+      housingId: j['housingId'] as String?,
     );
 
 OneTimeEvent _readEvent(Map<String, dynamic> j) => OneTimeEvent(
@@ -657,6 +665,14 @@ Assumptions _readAssumptions(Map<String, dynamic> j) => Assumptions(
       acaMagiCeilingPercentOfFpl: _d(j['acaMagiCeilingPercentOfFpl']),
       pmiTerminationLtv: _d(j['pmiTerminationLtv']),
       assetSaleCostRate: _d(j['assetSaleCostRate']),
+      assetAppreciationByCategory: j['assetAppreciationByCategory'] == null
+          ? Assumptions.defaultAssetAppreciation
+          : {
+              for (final e in (j['assetAppreciationByCategory']
+                      as Map<String, dynamic>)
+                  .entries)
+                AssetCategory.values.byName(e.key): _d(e.value),
+            },
       taxYearId: j['taxYearId'] as String,
     );
 

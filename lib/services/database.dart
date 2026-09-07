@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'readiness.dart';
+
 /// Local storage. §1.4 makes local-only a domain rule, so there is no sync, no
 /// telemetry, and no network client anywhere near this file.
 ///
@@ -23,7 +25,7 @@ class Database {
 
   final sqflite.Database _db;
 
-  static const _schemaVersion = 1;
+  static const _schemaVersion = 2;
 
   /// sqflite ships a mobile implementation only. This is what reaches macOS,
   /// Windows and Linux, and it must run before any database is opened.
@@ -41,6 +43,7 @@ class Database {
       p.join(dir.path, fileName),
       version: _schemaVersion,
       onCreate: (db, _) => _create(db),
+      onUpgrade: _upgrade,
     );
     return Database._(db);
   }
@@ -52,9 +55,34 @@ class Database {
       inMemoryDatabasePath,
       version: _schemaVersion,
       onCreate: (db, _) => _create(db),
+      onUpgrade: _upgrade,
     );
     return Database._(db);
   }
+
+  /// A plan written before setup existed belongs to somebody who has already
+  /// been through the app, so it arrives ready rather than back at step one.
+  static Future<void> _upgrade(sqflite.Database db, int from, int to) async {
+    if (from < 2) {
+      await _createSetup(db);
+      final ids = await db.query('households', columns: ['id']);
+      for (final row in ids) {
+        await db.insert('setup', {
+          'householdId': row['id'],
+          'passed': '',
+          'declaredReady': 1,
+        });
+      }
+    }
+  }
+
+  static Future<void> _createSetup(sqflite.Database db) => db.execute('''
+      CREATE TABLE setup (
+        householdId   TEXT PRIMARY KEY,
+        passed        TEXT NOT NULL,
+        declaredReady INTEGER NOT NULL,
+        FOREIGN KEY (householdId) REFERENCES households(id) ON DELETE CASCADE
+      )''');
 
   static Future<void> _create(sqflite.Database db) async {
     await db.execute('''
@@ -76,7 +104,7 @@ class Database {
         body  TEXT NOT NULL
       )''');
     // Snapshots are immutable once written and never edited in place
-      // (invariant 19): a plan change produces a new row.
+      // (invariant 18): a plan change produces a new row.
     await db.execute('''
       CREATE TABLE snapshots (
         id                        TEXT PRIMARY KEY,
@@ -98,6 +126,35 @@ class Database {
       )''');
     await db.execute(
         'CREATE INDEX snapshots_by_scenario ON snapshots(scenarioId, asOfDate)');
+    await _createSetup(db);
+  }
+
+  // --- setup progress -------------------------------------------------------
+
+  Future<void> saveSetup(String householdId, SetupProgress progress) =>
+      _db.insert(
+        'setup',
+        {
+          'householdId': householdId,
+          'passed': progress.passed.map((s) => s.name).join(','),
+          'declaredReady': progress.declaredReady ? 1 : 0,
+        },
+        conflictAlgorithm: sqflite.ConflictAlgorithm.replace,
+      );
+
+  Future<SetupProgress?> loadSetup(String householdId) async {
+    final rows = await _db
+        .query('setup', where: 'householdId = ?', whereArgs: [householdId]);
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    final names = (row['passed'] as String).split(',').where((n) => n.isNotEmpty);
+    return SetupProgress(
+      passed: {
+        for (final n in names)
+          ...SetupStep.values.where((s) => s.name == n),
+      },
+      declaredReady: (row['declaredReady'] as int) == 1,
+    );
   }
 
   Future<void> close() => _db.close();

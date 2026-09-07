@@ -13,11 +13,12 @@ TaxableIncome incomeFor(
   Household h, {
   Assumptions? assumptions,
   YearInputs inputs = const YearInputs(),
+  int at = year,
 }) {
   final a = assumptions ?? const Assumptions(taxYearId: 'us-2026');
   final wages = h.people
       .map((p) => computeWages(p,
-          household: h, taxYear: taxYear, year: year, currentYear: year))
+          household: h, taxYear: taxYear, year: at, currentYear: year))
       .toList();
   return computeTaxableIncome(
     h.taxUnits.first,
@@ -26,7 +27,7 @@ TaxableIncome incomeFor(
     taxYear: taxYear,
     assetClasses: assetClasses(),
     wages: wages,
-    year: year,
+    year: at,
     currentYear: year,
     inputs: inputs,
   );
@@ -205,8 +206,61 @@ void main() {
           person(id: 'p2', name: 'Sam', birthYear: 1985),
         ],
       );
-      final extra = taxYear.additionalStandardDeductionAge65.value;
+      final extra = taxYear
+          .additionalStandardDeductionAge65[FilingStatus.marriedFilingJointly]!
+          .value;
       expect(incomeFor(couple).deduction - incomeFor(one).deduction, extra);
+    });
+  });
+
+  group('§4.3.2 the deduction for people over 65', () {
+    Household retired({required int birthYear, required int pay,
+        FilingStatus status = FilingStatus.single, Person? spouse}) => Household(
+          id: 'h1',
+          taxUnits: [taxUnit(filingStatus: status)],
+          people: [person(birthYear: birthYear), ?spouse],
+          incomeStreams: [salary(pay: pay)],
+        );
+
+    test('is worth \$6,000 a head to someone modest', () {
+      final young = incomeFor(retired(birthYear: 1985, pay: 40000));
+      final old = incomeFor(retired(birthYear: 1950, pay: 40000));
+      expect(old.seniorDeduction, Money.dollars(6000));
+      expect(young.seniorDeduction, Money.zero);
+      expect(old.fedTaxable < young.fedTaxable, isTrue,
+          reason: 'the deduction has to reach taxable income to be worth '
+              'anything');
+    });
+
+    test('goes away as income rises, and is gone at \$175,000', () {
+      expect(incomeFor(retired(birthYear: 1950, pay: 125000)).seniorDeduction,
+          Money.dollars(3000),
+          reason: '6% of the \$50,000 above the threshold takes half of it');
+      expect(incomeFor(retired(birthYear: 1950, pay: 200000)).seniorDeduction,
+          Money.zero);
+    });
+
+    test('a couple loses it at the same income a single filer does', () {
+      // The statute reduces the per-person amount, so two qualifying spouses
+      // get twice as much and lose it just as fast.
+      final couple = retired(
+        birthYear: 1950,
+        pay: 200000,
+        status: FilingStatus.marriedFilingJointly,
+        spouse: person(id: 'p2', name: 'Sam', birthYear: 1952),
+      );
+      expect(incomeFor(couple).seniorDeduction, Money.dollars(6000),
+          reason: '\$12,000 less 6% of the \$50,000 over \$150,000');
+    });
+
+    test('lapses after 2028, which a long projection has to see', () {
+      expect(
+          incomeFor(retired(birthYear: 1950, pay: 40000), at: 2028)
+              .seniorDeduction
+              .isPositive,
+          isTrue);
+      expect(incomeFor(retired(birthYear: 1950, pay: 40000), at: 2029)
+          .seniorDeduction, Money.zero);
     });
   });
 

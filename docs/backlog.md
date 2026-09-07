@@ -1,0 +1,40 @@
+# Backlog
+
+Work the app owes, that is not a defect in what is already there. Two other
+lists exist and this is not either of them: §13 of [domain.md](domain.md) is
+what the model deliberately does not do, and
+[domain-review-backlog.md](domain-review-backlog.md) is ideas for the review
+lenses. This is the ordinary queue.
+
+## Data
+
+**State retirement-income exclusions.** `retirementIncomeExclusion` is zero for
+all fifty-one jurisdictions. The engine applies it correctly, capped by the
+retirement income a household actually received, so this is a data job rather
+than a model one. Illinois, Pennsylvania and Mississippi exempt retirement
+income almost entirely and roughly thirty more states exclude part of it,
+usually behind an age or income test that the current shape cannot express, so
+some of those states will need a qualifier field before their number can be
+entered. Until then retirees in those states are shown more state tax than they
+owe, which for a FIRE app is the wrong direction to be wrong in.
+
+**ACA benchmark premiums.** `acaBenchmarkPremiumByAge` is a smooth curve
+standing in for a national average, and 2026 premiums rose steeply. Real
+figures vary by rating area as much as by age, so the honest fix is either a
+rating-area table or a prompt that makes entering your own benchmark the
+expected path rather than an override.
+
+## Product
+
+**Coach marks over the screens.** The ordered setup path in
+`lib/screens/setup_screen.dart` covers getting a plan built. What is still
+missing is the tour of the app itself, pointing at the results panel and the
+flags and saying what they are for. Left until the setup path has been in front
+of people, since it will be obvious afterwards which parts still need pointing
+at.
+
+## Consistency
+
+**Year fields in the payroll deduction editor** are still typed, where the
+person and income editors pick them from a list. Same concept, two input
+styles.

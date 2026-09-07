@@ -26,7 +26,7 @@ class ResolvedContribution {
   /// Employer dollars, credited separately and never surplus to allocate.
   final Money employerMatch;
 
-  /// Raised where a cap actually bit (invariant 20).
+  /// Raised where a cap actually bit (invariant 19).
   final bool limitExceeded;
 
   const ResolvedContribution({

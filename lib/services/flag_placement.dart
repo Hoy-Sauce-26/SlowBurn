@@ -31,6 +31,8 @@ const flagHomes = <String, FlagHome>{
 
   // What is owed and owned.
   'escrowDiffersFromInferred': FlagHome.debts,
+  // Answered by adding rent, which is a spending line.
+  'noHousingCost': FlagHome.spending,
   'payoffLeavesResidualEscrow': FlagHome.debts,
   'derivedPayoffDiffersFromTerm': FlagHome.debts,
 

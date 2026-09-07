@@ -1,6 +1,8 @@
 import 'package:burn_engine/burn_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:slow_burn/services/database.dart';
+import 'package:slow_burn/services/persistence.dart';
+import 'package:slow_burn/services/providers.dart';
 
 Household household({String id = 'h1', num balance = 250000}) => Household(
       id: id,
@@ -100,6 +102,111 @@ void main() {
   late Database db;
   setUp(() async => db = await Database.openInMemory());
   tearDown(() async => db.close());
+
+  group('a plan written before a class existed', () {
+    test('has its savings moved off the one cash class there was', () async {
+      // What broke it in the app rather than in a test: the stored bundle
+      // replaced the built-in classes, so a savings account was left holding
+      // an id that now means "earning nothing".
+      final old = AssetClassesNotifier.defaults
+          .where((c) => c.label != AssetClassLabel.savings)
+          .toList();
+      final household = Household(
+        id: 'h1',
+        people: [
+          Person(
+            id: 'p1',
+            displayName: 'Alex',
+            birthDate: DateTime(1985, 6, 15),
+            taxUnitId: 'tu1',
+          ),
+        ],
+        accounts: [
+          Account(
+            id: 'a1',
+            personId: 'p1',
+            label: 'Savings',
+            kind: AccountKind.cashSavings,
+            taxTreatment: TaxTreatment.taxable,
+            limitFamily: LimitFamily.none,
+            balance: Money.dollars(40000),
+            isRestrictedPurpose: false,
+            assetAllocationId: 'cash',
+            contribution: const Contribution(
+                mode: ContributionMode.fixedAmount, value: 0),
+          ),
+        ],
+      );
+
+      final migrated = Persistence.withSavingsSplit(ExportBundle(
+        household: household,
+        scenarios: const [],
+        assetClasses: old,
+      ));
+      expect(migrated.accounts.single.assetAllocationId, 'savings');
+    });
+
+    test('leaves a checking account where it is', () async {
+      final old = AssetClassesNotifier.defaults
+          .where((c) => c.label != AssetClassLabel.savings)
+          .toList();
+      final household = Household(
+        id: 'h1',
+        accounts: [
+          Account(
+            id: 'a1',
+            personId: 'p1',
+            label: 'Checking',
+            kind: AccountKind.cashChecking,
+            taxTreatment: TaxTreatment.taxable,
+            limitFamily: LimitFamily.none,
+            balance: Money.dollars(6000),
+            isRestrictedPurpose: false,
+            assetAllocationId: 'cash',
+            contribution: const Contribution(
+                mode: ContributionMode.fixedAmount, value: 0),
+          ),
+        ],
+      );
+
+      final migrated = Persistence.withSavingsSplit(ExportBundle(
+        household: household,
+        scenarios: const [],
+        assetClasses: old,
+      ));
+      expect(migrated.accounts.single.assetAllocationId, 'cash',
+          reason: 'a current account really does earn nothing');
+    });
+
+    test('a plan saved since the split is left alone', () async {
+      final household = Household(
+        id: 'h1',
+        accounts: [
+          Account(
+            id: 'a1',
+            personId: 'p1',
+            label: 'Savings',
+            kind: AccountKind.cashSavings,
+            taxTreatment: TaxTreatment.taxable,
+            limitFamily: LimitFamily.none,
+            balance: Money.dollars(40000),
+            isRestrictedPurpose: false,
+            assetAllocationId: 'cash',
+            contribution: const Contribution(
+                mode: ContributionMode.fixedAmount, value: 0),
+          ),
+        ],
+      );
+
+      final migrated = Persistence.withSavingsSplit(ExportBundle(
+        household: household,
+        scenarios: const [],
+        assetClasses: AssetClassesNotifier.defaults,
+      ));
+      expect(migrated.accounts.single.assetAllocationId, 'cash',
+          reason: 'once both classes exist, the choice is the user\'s');
+    });
+  });
 
   group('§11 storage round trip', () {
     test('a household survives save and load', () async {

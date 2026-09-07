@@ -275,7 +275,7 @@ any savings or investment vehicle.
 | `label`                     | string                   |                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `kind`                      | enum                     | `traditional401k`, `roth401k`, `traditional403b`, `roth403b`, `traditionalTsp`, `rothTsp`, `traditionalIra`, `rothIra`, `hsa`, `sepIra`, `simpleIra`, `529`, `taxableBrokerage`, `cashSavings`, `cashChecking`                                                                                                                                                                                                                |
 | `taxTreatment`              | enum                     | `taxDeferred` \| `roth` \| `taxable` \| `hsaTriple` \| `educationTaxFree`: *derived from `kind`*, but stored so custom accounts are expressible.                                                                                                                                                                                                                                                                              |
-| `limitFamily`               | enum                     | Which contribution limit governs this account: *derived from `kind`*, stored alongside `taxTreatment` so the two move together (invariant 29). See the table below.                                                                                                                                                                                                                                                           |
+| `limitFamily`               | enum                     | Which contribution limit governs this account: *derived from `kind`*, stored alongside `taxTreatment` so the two move together (invariant 28). See the table below.                                                                                                                                                                                                                                                           |
 | `balance`                   | Money                    | Current value.                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `costBasis`                 | Money                    | Required for `taxable`. Entered once, then **maintained by the engine every projected year** (§6.3). Needed to compute capital gains tax on withdrawal or sale.                                                                                                                                                                                                                                                               |
 | `rothContributionBasis`     | Money                    | For `roth` accounts: the portion withdrawable before 59½ without tax or penalty. Entered once, then **maintained by the engine** (§6.3). Only an IRA's basis is directly reachable; see §8.4.1's `rothIraBasis` source. Critical to the bridge period (§8.3).                                                                                                                                                                 |
@@ -283,6 +283,7 @@ any savings or investment vehicle.
 | `contribution`              | Contribution             | The **flow**. See below.                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `employerId`                | ID?                      | Which `Employer` sponsors the plan, shared with that person's `IncomeStream`s (§3.3). Null for IRAs and taxable accounts. Resolves `employerComp` below, which bounds both the employer match and §415(c), so someone holding two unrelated employers' 401(k)s gets two ceilings. Also the linkage the deferred Rule of 55 would need (§13.3).                                                                                |
 | `allocationMode`            | enum                     | `singleClass` \| `weighted`: user-facing switch between a simple single-`AssetClass` rate and a blended, weighted mix.                                                                                                                                                                                                                                                                                                        |
+| `retirementAllocationId`    | ID?                      | What this is moved into from the solved retirement year, and null where it stays put. A portfolio that carries a household to retirement is rarely the one they live off afterwards: selling shares into a bad year is what sends people back to work, and holding less of them is the usual answer. Without this the projection earns an accumulation return through a whole decumulation and reports a plan lasting longer than it will (§6.2). |
 | `assetAllocationId`         | ID?                      | For `allocationMode = singleClass`: the one `AssetClass` determining growth rate.                                                                                                                                                                                                                                                                                                                                             |
 | `allocationWeights`         | {assetClassId, weight}[] | For `allocationMode = weighted`: weights summing to 1.0, blended into a weighted-average real return each year.                                                                                                                                                                                                                                                                                                               |
 | `isRestrictedPurpose`       | bool                     | Derived from `taxTreatment = educationTaxFree`, not from `kind`, that being the axis a custom account may set. Keying it on `kind` would let a custom education account count in `liquidNetWorth` with no `WithdrawalSource` able to spend it. Restricted accounts count in `netWorth` but are excluded from `liquidNetWorth` and every retirement measure built on it (§5, §8.2), and are not a `WithdrawalSource` (§8.4.1). |
@@ -385,7 +386,7 @@ and someone holding both a `traditionalIra` and a `rothIra` gets one IRA limit b
 Where the uncapped total across accounts sharing a limit exceeds it, each is reduced pro
 rata by its share, matching the rule for splitting a partially funded step of the
 **contribution waterfall**, the ordered list of destinations each year's surplus is poured
-through (§4.4.4). Later sections call it the waterfall. This is where §12's invariant 20 is
+through (§4.4.4). Later sections call it the waterfall. This is where §12's invariant 19 is
 enforced.
 
 **HSA contributions stop at 65**, since Medicare enrollment ends HSA eligibility and the
@@ -478,7 +479,7 @@ place in §4.1 and §4.3, with no balance and no growth.
 
 The money never reaches the paycheck, so §4.4 subtracts `payrollDeductions` from
 `grossIncome` directly and the corresponding spending must not also appear as an
-`ExpenseItem` (invariant 16).
+`ExpenseItem` (invariant 15).
 
 ### 3.5 Asset
 
@@ -489,19 +490,19 @@ covers everything else the household owns.
 |----------------------------|--------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `id`                       | ID     |                                                                                                                                                                                                                                                                                      |
 | `householdId`              | ID     | Owner.                                                                                                                                                                                                                                                                               |
-| `personId`                 | ID?    | Which person owns this, and so whose `TaxUnit` its sale gain is taxed on (§4.3.1). Null means jointly held, which resolves to the household's only `TaxUnit` and must therefore be set once there are two (invariant 25).                                                            |
+| `personId`                 | ID?    | Which person owns this, and so whose `TaxUnit` its sale gain is taxed on (§4.3.1). Null means jointly held, which resolves to the household's only `TaxUnit` and must therefore be set once there are two (invariant 24).                                                            |
 | `label`                    | string |                                                                                                                                                                                                                                                                                      |
 | `category`                 | enum   | `primaryResidence`, `investmentProperty`, `vehicle`, `collectible`, `businessEquity`, `other`                                                                                                                                                                                        |
 | `currentValue`             | Money  | Today's estimate, and an ordinary input. Re-enter it after an appraisal: every run projects forward from `asOfDate`, so a revised figure takes effect at once and `costBasis` is unaffected.                                                                                         |
 | `costBasis`                | Money  | Basis for gain on sale, entered as purchase price plus improvements to date. Static across the projection, unlike `Account.costBasis` (§6.3): later improvements are not modeled (§13.1).                                                                                            |
-| `realAppreciationRate`     | Rate   | Per asset, defaulted from category, user-overridable. Vehicles default negative. One rate across all three bands, since a home is not where the plan's risk sits.                                                                                                                    |
+| `realAppreciationRate`     | Rate   | Per asset, starting from `Assumptions.assetAppreciationByCategory` for its category and overridable here. Vehicles start negative. One rate across all three bands, since a home is not where the plan's risk sits.                                                                                                                    |
 | `accumulatedDepreciation`  | Money  | `investmentProperty` only. Straight-line depreciation claimed to date; entered as an opening figure and **accrued by the engine each year the property is held** (below). Reduces basis, so it raises the gain on sale, and is taxed at its own rate. Zero for every other category. |
 | `landFraction`             | Rate   | `investmentProperty` only. Portion of `costBasis` attributable to land, which is not depreciable. Default 0.20.                                                                                                                                                                      |
 | `securedByLiabilityId`     | ID?    | Links a house to its mortgage.                                                                                                                                                                                                                                                       |
 | `acquisitionYear`          | int?   | Year the household takes ownership. Null means already held, the common case. Before it the `Asset` is absent from every net-worth measure: see the purchase rules below.                                                                                                            |
 | `purchaseFundingAccountId` | ID?    | Where the down payment is drawn from. Null for an `Asset` acquired without paying for it.                                                                                                                                                                                            |
 | `plannedSaleYear`          | int?   | Year the household sells it. The only way an `Asset`'s value becomes spendable: see the sale rules below.                                                                                                                                                                            |
-| `saleProceedsAccountId`    | ID?    | Where net proceeds land. **Required when `plannedSaleYear` is set** (invariant 18), since proceeds that go nowhere silently vanish from the projection.                                                                                                                              |
+| `saleProceedsAccountId`    | ID?    | Where net proceeds land. **Required when `plannedSaleYear` is set** (invariant 17), since proceeds that go nowhere silently vanish from the projection.                                                                                                                              |
 
 **No `Asset` is ever liquid.**
 
@@ -673,7 +674,7 @@ A two-level structure: a meta-category groups related sub-category items.
 | `id`                       | ID     |                                                                                                               |
 | `householdId`              | ID     | Owner.                                                                                                        |
 | `label`                    | string |                                                                                                               |
-| `metaCategory`             | enum   | `housing`, `transportation`, `food`, `health`, `childcare`, `discretionary`, `insurance`, `education`, `misc` |
+| `metaCategory`             | enum   | `housing`, `housingSupport`, `transportation`, `food`, `health`, `childcare`, `discretionary`, `insurance`, `education`, `misc`. `housing` is shelter itself and the only category that answers §3.7's roof question; `housingSupport` is what a roof costs to keep. |
 | `defaultRelativeInflation` | Rate   | **Non-null**, defaulting to 0, which terminates the fallback below.                                           |
 
 Two `metaCategory` values are load-bearing beyond reporting. §8.4.1's `hsaQualifiedMedical`
@@ -700,6 +701,7 @@ anywhere else leaves the college account untouched.
 | `relativeInflationRate` | Rate?  | **Real, relative to general inflation.** Healthcare ≈ +2.5%; groceries ≈ 0%; consumer electronics negative. Null inherits the category's `defaultRelativeInflation`, which is the whole point of that field; a stored 0 is a deliberate flat rate and overrides it. |
 | `phase`                 | enum   | `preRetirementOnly` \| `postRetirementOnly` \| `both`. The boundary is the household's `retirementYear`, its first retired year (§3.1), so a `preRetirementOnly` item runs through the year before it and a `postRetirementOnly` item from it.                      |
 | `postRetirementAmount`  | Money? | For `both` items whose amount changes at retirement.                                                                                                                                                                                                                |
+| `housingId`             | ID?    | For a `housingSupport` item: the home it belongs to, naming a `primaryResidence` `Asset` or the `housing` `ExpenseItem` that is the rent. Charged only in the years that home stands (§3.7). |
 
 **Relative inflation compounds; nothing else about an expense does.** An `ExpenseItem`'s
 amount for a projected year is
@@ -726,7 +728,32 @@ earned `IncomeStream`s and committed contributions end at their own retirement y
 catch-up eligibility, and claiming age turn on their own `birthDate`.
 
 **No `ExpenseItem` may restate a loan payment, its escrow, a `PayrollDeduction`, a health
-insurance premium, or an `OneTimeEvent` outflow** (invariant 16).
+insurance premium, or an `OneTimeEvent` outflow** (invariant 15).
+
+**A bill belongs to a roof.** A `housingSupport` `ExpenseItem` may name the home it is for
+in `housingId`, resolving to a `primaryResidence` `Asset` or to the `housing` `ExpenseItem`
+that is the rent. It is then charged only in the years that home stands, so property tax and
+HOA dues stop when the house is sold rather than running to the end of the projection. An
+item naming nothing keeps its own dates, which is how a cost that outlives a house is said
+deliberately; one naming a home that is no longer there keeps them too, since dropping
+spending because a reference went stale would shrink a plan silently.
+
+**Shelter is not the bills that come with it.** `housing` covers rent and lodging, what is
+paid to have somewhere to live. `housingSupport` covers utilities, internet, property tax
+outside escrow, HOA dues, contents insurance and upkeep. Only the first answers the roof
+question below, because a household paying an electricity bill for forty years has not
+thereby housed itself, and a single category would let it claim to have done.
+
+**Everybody lives somewhere.** Housing is read across the whole projection rather than a
+year at a time, since the year that goes wrong is rarely this one: a home with a
+`plannedSaleYear` covers every year up to it and none after, and the years after are what
+nobody notices. A projected year in which the household holds no `primaryResidence` (§3.5)
+and pays no active `housing` `ExpenseItem` raises **`noHousingCost`**,
+because shelter is the largest cost a plan can lose by omission rather than by choice: setting
+`plannedSaleYear` on a home is one field, and nothing else in the model notices that the
+household now needs somewhere to live. Owning outright counts as housed with no mortgage
+left, the cost of that being the escrow §3.6 carries on charging after payoff. A warning
+rather than a block, since a year spent in someone else's spare room is a real answer.
 
 ### 3.8 OneTimeEvent
 
@@ -742,7 +769,7 @@ bought.
 | `year`         | int    |                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `amount`       | Money  | Signed: positive inflow, negative outflow.                                                                                                                                                                                                                                                                                                                                                                   |
 | `kind`         | enum   | `inheritance`, `tuition`, `majorRepair`, `vehiclePurchase`, `windfall`, `other`. A label; no engine rule branches on it.                                                                                                                                                                                                                                                                                     |
-| `accountId`    | ID?    | Destination for an inflow; **source for an outflow**. Required for outflows (invariant 17): where the $40,000 for a truck comes from changes the projection materially, and only the user knows. An inflow with no account named lands in that year's `netSurplus`. If the named account cannot cover an outflow, the remainder falls through to `netSurplus` and is sourced per §4.4, flagging `shortfall`. |
+| `accountId`    | ID?    | Destination for an inflow; **source for an outflow**. Required for outflows (invariant 16): where the $40,000 for a truck comes from changes the projection materially, and only the user knows. An inflow with no account named lands in that year's `netSurplus`. If the named account cannot cover an outflow, the remainder falls through to `netSurplus` and is sourced per §4.4, flagging `shortfall`. |
 | `taxTreatment` | enum   | `nonTaxable`, `ordinaryIncome`, `capitalGainShortTerm`, `capitalGainLongTerm`: the two capital-gain kinds feed `realizedShortTermGains`/`realizedLongTermGains` in §4.3.1 respectively.                                                                                                                                                                                                                      |
 
 ### 3.9 AssetClass and Assumptions
@@ -752,7 +779,7 @@ bought.
 | Field                     | Type | Notes                                                                 |
 |---------------------------|------|-----------------------------------------------------------------------|
 | `id`                      | ID   |                                                                       |
-| `label`                   | enum | `usStocks`, `intlStocks`, `bonds`, `reit`, `cash`, `crypto`           |
+| `label`                   | enum | `usStocks`, `intlStocks`, `bonds`, `reit`, `savings`, `cash`, `crypto`. `savings` is money in a bank paying interest; `cash` is money that earns nothing. |
 | `expectedRealReturn`      | Rate | The middle band.                                                      |
 | `pessimisticRealReturn`   | Rate | The low band.                                                         |
 | `optimisticRealReturn`    | Rate | The high band.                                                        |
@@ -801,6 +828,7 @@ materially higher tax drag than its headline yield suggests.
 | `projectionHorizonAge`          | Default 95: the age the portfolio must survive to, evaluated against the **youngest** person in the household (§8.2).                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `acaMagiCeilingPercentOfFpl`    | Default 200%. Pre-65 MAGI ceiling for subsidy-aware withdrawal ordering (§8.4.4). From 63 onward the engine takes the lower of this and the next IRMAA threshold, because of IRMAA's two-year lookback.                                                                                                                                                                                                                                                                                                                |
 | `pmiTerminationLtv`             | Default 0.78. The loan-to-value at which PMI drops off a mortgage, measured against the securing `Asset`'s `costBasis` (§3.6).                                                                                                                                                                                                                                                                                                                                                                                         |
+| `assetAppreciationByCategory`   | Real appreciation per `AssetCategory`, and the rate a new `Asset`'s `realAppreciationRate` starts from rather than a zero somebody has to notice and correct (§3.5). An `Asset` keeps whatever rate it was saved with, so changing this moves the suggestion and not the plan. A vehicle defaults to −0.10, a residence to 0.005. |
 | `assetSaleCostRate`             | Default 0.06: agent commission, transfer taxes, and closing costs on an `Asset` sale, charged on real-property categories only (§3.5).                                                                                                                                                                                                                                                                                                                                                                                 |
 | `taxYearId`                     | Which bundled ruleset to project under.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
@@ -840,7 +868,7 @@ household across scenarios is deferred (§13.1).
 |--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `personId`                     |                                                                                                                                                                                                          |
 | `estimatedMonthlyBenefitAtFra` | From the user's SSA statement.                                                                                                                                                                           |
-| `claimingAge`                  | 62–70, whole years (consistent with the engine's annual granularity, §1.2), and enforced by invariant 27, since                                   §3.11's delayed-retirement term has no cap of its own. |
+| `claimingAge`                  | 62–70, whole years (consistent with the engine's annual granularity, §1.2), and enforced by invariant 26, since                                   §3.11's delayed-retirement term has no cap of its own. |
 | `includeInProjection`          | bool: users vary in whether they want to count on it.                                                                                                                                                    |
 
 **Claiming-age adjustment.** `estimatedMonthlyBenefitAtFra` is the benefit at full
@@ -901,8 +929,8 @@ Marked `indexed: false` below with **(fixed)**, attached to the threshold it gov
 carry no flag, deflating one being meaningless: 3.8% is 3.8% in any year.
 
 **A table keyed by age or size continues past its last row.** `federalPovertyLevel` carries
-the per-additional-person increment its guidelines publish, the denominator of every ACA
-subsidy; `rmdDivisorTable` and `rmdAgeByBirthYear` saturate at their final rows, as the
+the per-additional-person increment its guidelines publish for each region, Alaska's and
+Hawaii's being larger than the mainland's, and it is the denominator of every ACA subsidy; `rmdDivisorTable` and `rmdAgeByBirthYear` saturate at their final rows, as the
 Uniform Lifetime Table's own "120 and older" entry does. `socialSecurityFraByBirthYear` states
 a floor instead (§3.11). Composed of:
 
@@ -911,8 +939,11 @@ a floor instead (§3.11). Composed of:
 - `federalBrackets[filingStatus]`: ordinary income
 - `federalLtcgBrackets[filingStatus]`: 0% / 15% / 20% preferential rates
 - `standardDeduction[filingStatus]`
-- `additionalStandardDeductionAge65`: applied **per qualifying person** in the TaxUnit
-  (§4.3.2)
+- `additionalStandardDeductionAge65[filingStatus]`: applied **per qualifying person** in
+  the TaxUnit, and smaller for a married filer than for someone on their own (§4.3.2)
+- `seniorDeduction`: `amountPerPerson`, `minAge`, `throughYear`, and a
+  `phaseOut[filingStatus]`. The deduction people 65 and over receive through 2028, absent
+  in a year that grants none (§4.3.2)
 - `qbiDeductionRate` (0.20) **(fixed)** and `qbiThreshold[filingStatus]`, above which the §199A wage
   and SSTB limits begin.
   Recorded so the engine can raise `qbiLimitNotModeled`, since those limits are deferred
@@ -984,7 +1015,8 @@ a floor instead (§3.11). Composed of:
   statute has never indexed (§4.3.4). Other federal credits are out of scope (§13.2).
 - `federalPovertyLevel[stateCode][householdSize]`, where household size is **per TaxUnit**,
   meaning its persons plus its active dependents. Alaska and Hawaii carry their own much
-  higher figures, and the ACA credit is a tax-family measure rather than a household one
+  higher figures, and their own `federalPovertyLevelIncrement[region]` past the last
+  published row. The ACA credit is a tax-family measure rather than a household one
   (§4.3.5)
 - `acaApplicablePercentageTable`: ordered `{fplPercent, applicablePercent}` points,
   linearly interpolated **between** consecutive points. Two points sharing an `fplPercent`
@@ -1028,7 +1060,7 @@ can be compared against it. See §10 for why this exists and how it is triggered
 | `id`                                                                            | ID                                                           |                                                                                                                                                                                                                                                                                     |
 | `scenarioId`                                                                    | ID                                                           | Snapshots track one scenario's trajectory over time, not the whole household.                                                                                                                                                                                                       |
 | `asOfDate`                                                                      | date                                                         | The real calendar date this snapshot was taken.                                                                                                                                                                                                                                     |
-| `trigger`                                                                       | enum                                                         | `auto` \| `manual`. Only an `auto` row is deleted when a later same-day edit supersedes it (§10.1, invariant 19).                                                                                                                                                                   |
+| `trigger`                                                                       | enum                                                         | `auto` \| `manual`. Only an `auto` row is deleted when a later same-day edit supersedes it (§10.1, invariant 18).                                                                                                                                                                   |
 | `label`                                                                         | string?                                                      | User-supplied, for manual checkpoints ("Before the house purchase").                                                                                                                                                                                                                |
 | `inputDigest`                                                                   | string                                                       | A cheap fingerprint of the household, the scenario, and the `AssetClass` rates at that moment, those being everything the output moves with. Used to skip writing a new auto-snapshot when nothing has actually changed.                                                            |
 | `taxYearId`                                                                     | ID                                                           | Which bundled ruleset produced these figures. Two snapshots computed under different tax years are not cleanly comparable, and §10.2 has to be able to say so rather than reporting a bracket change as progress.                                                                   |
@@ -1261,16 +1293,30 @@ The §199A half applies only where someone has self-employment or rental income.
 ```
 federalAgi      = nonSSIncome + taxableSS
 
-age65Additional = TaxYear.additionalStandardDeductionAge65
+age65Additional = TaxYear.additionalStandardDeductionAge65[status]
                     × count of persons in this TaxUnit with age(year) ≥ 65
 deduction       = max(TaxYear.standardDeduction[status] + age65Additional,
                       TaxUnit.itemizedDeductionTotal ?? 0)
 
-taxableBeforeQbi = max(0, federalAgi − deduction)
+seniorDeduction = 0 where TaxYear.seniorDeduction is absent or
+                    year > TaxYear.seniorDeduction.throughYear, otherwise
+                  TaxYear.seniorDeduction.amountPerPerson
+                    × (1 − phaseOut[status].fractionAt(federalAgi))
+                    × count of persons in this TaxUnit with
+                      age(year) ≥ TaxYear.seniorDeduction.minAge
+
+taxableBeforeQbi = max(0, federalAgi − deduction − seniorDeduction)
 ```
 
 `age65Additional` is **per qualifying person**, so a `marriedFilingJointly` couple both
 past 65 receives it twice. The parallel addition for blindness is not modeled (§13.2).
+
+`seniorDeduction` is the separate deduction the 2025 act gave people aged 65 and over,
+worth $6,000 a head through 2028. It stands outside the standard-or-itemized choice, so a
+household that itemizes still receives it. The statute phases out the **per-person** amount
+rather than the household total, which is why a couple loses it at the same income a single
+filer does. `throughYear` is what stops a projection carrying it into the 2030s, and a tax
+year that has no such deduction simply leaves the field out.
 
 **Qualified Business Income deduction (§199A).**
 
@@ -1444,11 +1490,12 @@ The state and locality layers, then everything above summed into one figure the 
 spends.
 
 ```
-stateTax        = brackets or flat rate for this TaxUnit's filingStatus, from
+stateTax        = max(0, schedule − personalCredit[filingStatus]), where schedule is the
+                  brackets or flat rate for this TaxUnit's filingStatus from
                   TaxYear.stateRules[stateCode], applied to federalAgi adjusted by that
                   state's conformity flags, less its own standard deduction, personal
-                  exemptions, and retirement-income exclusions, and zero in the states
-                  that levy none
+                  exemption, and retirement-income exclusion. Zero in the states that
+                  levy none
 localTax        = the same shape against TaxYear.localRules[localityCode];
                   0 where localityCode is null
 ```
@@ -1462,6 +1509,12 @@ add their own layer.
 Schedules are held per filing status, because most states widen their brackets for a joint
 return and reading a single filer's schedule for a couple overstates what they owe. A state
 that publishes one schedule for everybody carries the same one under each status.
+
+The retirement-income exclusion is capped by `pensionIncome + rmdIncome`, since a state that
+exempts retirement income exempts that and not a salary. Six states hand out a flat personal
+credit where others give an exemption, so `personalCredit` comes off the tax itself and
+stops at zero rather than turning into a refund. Credits and exemptions that taper away with
+income are not modeled (§13.2).
 
 ```
 withdrawalPenalty = Σ over this TaxUnit's draws this year (§8.4.1):
@@ -1719,7 +1772,7 @@ another's.
 
 A scenario's `contributionWaterfall` reorders or omits these steps. It cannot invent new
 ones, and it cannot change a step's `fundingWindow`. **`taxableBrokerage` is the one step it
-may not drop** (invariant 30), being what catches whatever the others leave; without it a
+may not drop** (invariant 29), being what catches whatever the others leave; without it a
 year's surplus would have nowhere to land.
 
 **`sep` and `education` have no step, so surplus never reaches them.** For a `529` that is
@@ -1879,7 +1932,9 @@ So each account's flows earn half a year:
 openingBalance = balance at the start of the year
 netFlows       = contributions + employer match + deposits − withdrawals − outflows
 r              = the band's real return for this account's allocation: its
-                 `assetAllocationId`, or the `allocationWeights` blend, per `allocationMode`
+                 `assetAllocationId`, or the `allocationWeights` blend, per `allocationMode`.
+                 From the solved retirement year on, `retirementAllocationId` takes over
+                 where one is set, and the same swap governs `incomeYield`
 
 closingBalance = openingBalance × (1 + r)^frac  +  netFlows × (1 + r)^(frac / 2)
 ```
@@ -1892,6 +1947,12 @@ the closed form for flows spread uniformly through the year, within a hundredth 
 of a twelve-step loop at ordinary return rates, at the cost of one exponent.
 
 ### 6.3 Basis maintenance
+
+**A cash account opens at full basis.** `cashSavings` and `cashChecking` hold dollars that
+have already been taxed, so the engine starts them at `max(costBasis, balance)` whatever was
+entered. Interest raises basis as it is taxed each year, which keeps it that way. Without
+this, a $40,000 savings balance entered with no basis is taxed on the way out as though every
+dollar of it were gain.
 
 **Basis is engine state.** The user enters an opening `costBasis` and
 `rothContributionBasis`; from there the engine maintains both every year. Leaving them frozen
@@ -1985,7 +2046,7 @@ measures, the FIRE number for that year, and a `flags[]` array (`shortfall`,
 `derivedPayoffDiffersFromTerm`, `filingStatusNoLongerQualifies`,
 `hsaContributionsStoppedAtMedicare`, `rothRolloverAssumed`, `retirementSpendingNotLevel`,
 `earningsTestNotModeled`,
-`escrowDiffersFromInferred`).
+`escrowDiffersFromInferred`, `noHousingCost`).
 
 A run produces three `ProjectionResult`s per scenario, one per return band, each carrying
 that band's ordered `YearResult`s and its solved `retirementYear`. A run may also
@@ -2042,6 +2103,11 @@ use. It must never silently imply currency it does not have.
 
 ### 7.6 State and territory coverage
 
+Each entry of `stateRules[stateCode]` and `localRules[localityCode]` holds `brackets` or a
+`flatRate`, a `standardDeduction`, a `personalExemption`, a `personalCredit`, a
+`retirementIncomeExclusion`, and `conformsToPreTaxDeferrals`. Every figure but the last two
+is held per filing status.
+
 `TaxYear.stateRules` covers **all 50 states and the District of Columbia** at launch. This
 is the largest recurring data-maintenance commitment in the app (§1.4). Each state's rules
 are pulled from that state's Department of Revenue publications for the tax year, normalized
@@ -2083,7 +2149,7 @@ denominator gives $85,109 where the answer is $82,231.
 
 `safeWithdrawalRate` is a **real** rate, consistent with §1.1, and strictly positive over a
 horizon of at least one year, since it and the annuity are both denominators here
-(invariant 28). The input is **retirement**
+(invariant 27). The input is **retirement**
 spending (§3.7), including debt service still outstanding in retirement plus any escrow
 costs that continue past a mortgage payoff (§3.6).
 
@@ -2641,7 +2707,7 @@ approximation in place of an accurate, expensive one.
    `Household`.
 4. Every `TaxUnit`, `Asset`, `Liability`, `ExpenseCategory`, `OneTimeEvent`, and `Scenario`
    names an existing `Household` in `householdId`, and nothing else carries one. Where an
-   attributed `personId` supplies a second path to a `Household`, invariant 25 holds
+   attributed `personId` supplies a second path to a `Household`, invariant 24 holds
    the two together.
 5. `Asset.securedByLiabilityId` and `Liability.securedAssetId` must agree.
 6. Every `ProjectionSnapshot.scenarioId` must reference an existing `Scenario`; a deleted
@@ -2667,15 +2733,12 @@ approximation in place of an accurate, expensive one.
 
 **Accounting**
 
-13. `Account.costBasis ≤ Account.balance` for taxable accounts at entry (warn, do not block;
-    losses are real). The engine maintains basis thereafter per §6.3, and a projected basis
-    above balance is a genuine unrealized loss.
-14. `rothContributionBasis ≤ balance` for Roth accounts, at entry and after every projected
+13. `rothContributionBasis ≤ balance` for Roth accounts, at entry and after every projected
     year.
-15. `monthlyEscrowAmount ≤ monthlyPayment` and `monthlyPmiAmount ≤ monthlyEscrowAmount` where
+14. `monthlyEscrowAmount ≤ monthlyPayment` and `monthlyPmiAmount ≤ monthlyEscrowAmount` where
     each is set, since escrow is a portion of the payment and PMI a portion of escrow (§3.6).
     `escrowContinuesAfterPayoff` is in [0, 1].
-16. **No expense is counted twice.** Five mechanisms already carry spending into
+15. **No expense is counted twice.** Five mechanisms already carry spending into
     `netSurplus`, and an `ExpenseItem` must not duplicate any of them:
 
 - a `Liability`'s payment reaches cash flow through §4.4's `debtService` term, which also
@@ -2695,10 +2758,10 @@ approximation in place of an accurate, expensive one.
   This is a warn-and-flag check (`possibleDoubleCount`), not a block: the engine cannot
   prove two similarly-named lines are the same obligation.
 
-17. An `OneTimeEvent` with a negative `amount` must name an `accountId` (§3.8). Inflows may
+16. An `OneTimeEvent` with a negative `amount` must name an `accountId` (§3.8). Inflows may
     leave it null.
-18. An `Asset` with `plannedSaleYear` set must name a `saleProceedsAccountId` (§3.5).
-19. `ProjectionSnapshot`s are immutable once written and are never recomputed or edited in
+17. An `Asset` with `plannedSaleYear` set must name a `saleProceedsAccountId` (§3.5).
+18. `ProjectionSnapshot`s are immutable once written and are never recomputed or edited in
     place; a plan change produces a new snapshot. A same-day snapshot with `trigger =
     auto` that a later edit supersedes is **deleted** rather than edited (§10.1), which is how a
     sitting
@@ -2707,41 +2770,41 @@ approximation in place of an accurate, expensive one.
 
 **Limits**
 
-20. Per-person annual contributions do not exceed the limits for their account's
+19. Per-person annual contributions do not exceed the limits for their account's
     `limitFamily` (§3.4.2): **cap in projection and raise `contributionLimitExceeded`**, do not
     block entry, since the user may be recording an actual over-contribution.
-21. A `Person` whose active `hsaCoverage` tier is `none`, or who is 65 or older, may not make
+20. A `Person` whose active `hsaCoverage` tier is `none`, or who is 65 or older, may not make
     a non-zero `hsa` `Contribution` in that year. A `family` tier shares one base limit across
     the `TaxUnit`; the 55-and-over catch-up is per person and is never shared (§3.1, §3.4.2).
-22. `Asset.accumulatedDepreciation ≤ Asset.costBasis × (1 − landFraction)`. Outside
+21. `Asset.accumulatedDepreciation ≤ Asset.costBasis × (1 − landFraction)`. Outside
     `investmentProperty`, `accumulatedDepreciation` is zero and `landFraction` is unread
     (§3.5).
-23. A `Dependent`'s `supportEndYear ≥ birthDate.year`. A `TaxUnit` filing `headOfHousehold`
+22. A `Dependent`'s `supportEndYear ≥ birthDate.year`. A `TaxUnit` filing `headOfHousehold`
     in a year with no active dependent is computed as `single` for that year and flagged, not
     blocked (§3.2).
-24. A waterfall step that funds a retirement account requires that person to have earned
+23. A waterfall step that funds a retirement account requires that person to have earned
     income that year (§4.4.4), as does a committed `Contribution` to one. A `percentOfGross`
     contribution self-gates, its base being zero; a `fixedAmount` one does not, which is
     what this catches.
-25. An `Asset`, `Liability`, or `OneTimeEvent` must name a `personId` once its `Household`
+24. An `Asset`, `Liability`, or `OneTimeEvent` must name a `personId` once its `Household`
     holds more than one `TaxUnit`, and that `Person` must belong to that `Household`.
     §4.3's sums are per `TaxUnit`, so an unattributed one would reach both returns. Where
     a single `TaxUnit` exists, null resolves to it and nothing need be entered.
-26. Every `Account`, `ExpenseCategory`, or `Employer` named by another entity belongs to
+25. Every `Account`, `ExpenseCategory`, or `Employer` named by another entity belongs to
     the same `Household` as the entity naming it.
     Invariants 16 and 17 require the account and category references to exist; this
     keeps all three inside the household, so money cannot land, and a match cannot be sized,
     where the projection stops seeing it.
-27. `SocialSecurityBenefit.claimingAge` is in [62, 70]. §3.11's `monthsLate` term is
+26. `SocialSecurityBenefit.claimingAge` is in [62, 70]. §3.11's `monthsLate` term is
     unbounded on its own, so a later age would award delayed-retirement credits that
     statute stops accruing at 70.
-28. `Assumptions.safeWithdrawalRate` is greater than 0, and `retirementDurationYears` (§5)
+27. `Assumptions.safeWithdrawalRate` is greater than 0, and `retirementDurationYears` (§5)
     is at least 1. §8.1 divides by `r` twice and by an annuity that is 0 at `N = 0`, which a
     `plannedRetirementAge` equal to `projectionHorizonAge` reaches.
-29. An `Account` whose `taxTreatment` is `roth` or `taxDeferred` has a `limitFamily` other
+28. An `Account` whose `taxTreatment` is `roth` or `taxDeferred` has a `limitFamily` other
     than `none`. Both are stored, so a custom account could otherwise pair Roth treatment
     with an uncapped family and contribute without bound (§3.4.2).
-30. `Assumptions.contributionWaterfall` contains `taxableBrokerage`. Every other step may be
+29. `Assumptions.contributionWaterfall` contains `taxableBrokerage`. Every other step may be
     omitted, and Coast FIRE omits five of them (§9.3), but a waterfall with no terminal step
     leaves a positive `netSurplus` unallocated with no account to hold it (§4.4.4).
 
@@ -2795,7 +2858,15 @@ optimistic ones read as a group, and those whose condition the engine can detect
   Part A start (§3.4.2)
 - Filing-status transitions other than `headOfHousehold` falling back to `single` (§3.2)
 - Equity compensation beyond simple RSU vesting: ISOs, ESPP, 83(b)
-- The additional standard deduction for blindness. The age-65 addition **is** modeled (§4.3.2)
+- The additional standard deduction for blindness. The age-65 addition **is** modeled, as is
+  the deduction for people 65 and over that runs through 2028 (§4.3.2)
+- State credits and exemptions that taper with income, such as Connecticut's and Rhode
+  Island's personal exemptions, Wisconsin's standard deduction, and Utah's taxpayer credit.
+  Each is carried flat or left out, which misstates tax at higher incomes (§4.3.6)
+- State dependent credits, Arizona's among them, where only personal credits are modeled
+- Washington's tax on capital gains, the one state levy that runs on realised gain rather
+  than ordinary income. Washington is carried as a state with no income tax, which is right
+  for wages and wrong for a large sale (§4.3.6)
 
 ### 13.3 Retirement mechanics
 
