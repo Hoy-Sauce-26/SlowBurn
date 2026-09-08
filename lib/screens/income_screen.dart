@@ -224,7 +224,7 @@ class IncomeScreen extends ConsumerWidget {
               YearField(
                 label: 'End year',
                 helper: kind.isCoverageRelated
-                    ? 'Leave blank to end it when your health cover through '
+                    ? 'Leave blank to end it when your health coverage through '
                         'work does.'
                     : 'Leave blank to end it when you retire.',
                 initial: endYear,

@@ -82,6 +82,7 @@ Future<ProviderContainer> pumpApp(
   WidgetTester tester, {
   Size size = const Size(1600, 1200),
   bool ready = false,
+  Household? household,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -92,7 +93,8 @@ Future<ProviderContainer> pumpApp(
       taxYearProvider.overrideWith((ref) => taxYear),
       if (ready) ...[
         setupProgressProvider.overrideWith(() => _Declared()),
-        householdProvider.overrideWith(() => _Fixed(readyHousehold())),
+        householdProvider
+            .overrideWith(() => _Fixed(household ?? readyHousehold())),
       ],
     ],
   );
@@ -113,21 +115,39 @@ Future<ProviderContainer> pumpApp(
 
 /// A `DropdownMenu` keeps every entry in the tree whether open or not, so the
 /// one to tap is whichever the overlay put on top.
+/// The dropdown carrying a given label. `find.byType` cannot be used, since
+/// these are `DropdownMenu<int?>` and friends rather than the raw type.
+Finder dropdown(String label) => find.ancestor(
+      of: find.text(label),
+      matching: find.byWidgetPredicate((w) => w is DropdownMenu),
+    );
+
 Future<void> pick(WidgetTester tester, String field, String value) async {
-  final menu = find.ancestor(
-      of: find.text(field),
-      matching: find.byWidgetPredicate((w) => w is DropdownMenu));
-  await tester.tap(menu.first);
+  // A field only half on screen takes a tap that lands somewhere else, and
+  // since the editor stopped closing on a stray click that shows up as a menu
+  // that never opened.
+  final menu = dropdown(field).first;
+  await tester.ensureVisible(menu);
   await tester.pumpAndSettle();
+  await tester.tap(menu);
+  await tester.pumpAndSettle();
+
+  // Every entry stays mounted whether its menu is open or not, so the one to
+  // tap is whichever is really on top. Where the open list has scrolled past
+  // it, typing narrows the list until it is there, which is what a person
+  // would do anyway.
   var item = find.widgetWithText(MenuItemButton, value).hitTestable();
   if (item.evaluate().isEmpty) {
-    await tester.ensureVisible(find.widgetWithText(MenuItemButton, value).last);
+    await tester.enterText(
+        find.descendant(of: menu, matching: find.byType(TextField)), value);
     await tester.pumpAndSettle();
     item = find.widgetWithText(MenuItemButton, value).hitTestable();
   }
   await tester.tap(item.last);
   await tester.pumpAndSettle();
 }
+
+
 
 Future<void> tapRail(WidgetTester tester, String label) async {
   await tester.tap(find.text(label).first);
@@ -291,6 +311,232 @@ void main() {
           container.read(scenarioProvider).assumptions
               .assetAppreciationByCategory[AssetCategory.vehicle],
           closeTo(-0.08, 1e-9));
+    });
+  });
+
+  group('the breakdown asks three questions in order', () {
+    testWidgets('and answers each of them', (tester) async {
+      await pumpApp(tester, ready: true);
+      await tapRail(tester, 'Breakdown');
+
+      expect(find.text('What will I be spending in retirement?'),
+          findsOneWidget);
+      expect(find.text('What do I need to own to pay for that?'),
+          findsOneWidget);
+      await tester.scrollUntilVisible(
+          find.text('How long until I own it?'), 300,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('How long until I own it?'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+          find.text('What will I be spending in retirement?'), -300,
+          scrollable: find.byType(Scrollable).first);
+      final one =
+          tester.getTopLeft(find.text('What will I be spending in retirement?'));
+      final two =
+          tester.getTopLeft(find.text('What do I need to own to pay for that?'));
+      expect(one.dy, lessThan(two.dy));
+    });
+
+    testWidgets('the three ways of asking it are shown with their rates',
+        (tester) async {
+      // Two of them differ only by rate and two only by shape, which is the
+      // only way the ordering reads as sensible.
+      await pumpApp(tester, ready: true);
+      await tapRail(tester, 'Breakdown');
+      await tester.scrollUntilVisible(
+          find.text('Three ways of asking it'), 200,
+          scrollable: find.byType(Scrollable).first);
+
+      expect(find.text('Never spend the capital'), findsNWidgets(2));
+      expect(find.textContaining('Spend it to zero over'), findsOneWidget);
+      expect(find.textContaining('your withdrawal rate · the figure above'),
+          findsOneWidget);
+      expect(find.textContaining('what you will hold'), findsNWidgets(2));
+    });
+
+    testWidgets('the retirement holding is set where its rate is used',
+        (tester) async {
+      final container = await pumpApp(tester, ready: true);
+      await tapRail(tester, 'Breakdown');
+      // A dropdown renders its label twice, so this scrolls to the first.
+      await tester.scrollUntilVisible(
+          find.text('What you move into at retirement').first, 200,
+          scrollable: find.byType(Scrollable).first);
+
+      await pick(tester, 'What you move into at retirement', 'Bonds');
+      for (final a in container
+          .read(householdProvider)
+          .accounts
+          .where((a) => !a.kind.isCash)) {
+        expect(a.retirementAllocationId, 'bonds');
+      }
+    });
+
+    testWidgets('says which rate each figure uses and what none of them count',
+        (tester) async {
+      // Asked: why does the headline differ from the drawdown figure, is it
+      // Social Security? It is the rate and the shape, and none of the three
+      // count Social Security at all.
+      await pumpApp(tester, ready: true);
+      await tapRail(tester, 'Breakdown');
+      await tester.scrollUntilVisible(
+          find.textContaining('None of the three counts Social Security'),
+          200,
+          scrollable: find.byType(Scrollable).first);
+
+      expect(find.textContaining('None of the three counts Social Security'),
+          findsOneWidget);
+      expect(find.textContaining('A lower rate needs more'), findsOneWidget);
+    });
+
+    testWidgets('a rate changed here reaches the scenario', (tester) async {
+      final container = await pumpApp(tester, ready: true);
+      await tapRail(tester, 'Breakdown');
+      final field = find.widgetWithText(TextFormField, 'Safe withdrawal rate');
+      await tester.scrollUntilVisible(field, 200,
+          scrollable: find.byType(Scrollable).first);
+
+      await tester.enterText(field, '3.25');
+      await tester.pump();
+      expect(
+          container.read(scenarioProvider).assumptions.safeWithdrawalRate,
+          closeTo(0.0325, 1e-9));
+    });
+
+    testWidgets('the health premium is shown rather than left to be guessed',
+        (tester) async {
+      // It is computed from income and household size, and adding it as a
+      // spending line would count it twice.
+      final early = readyHousehold().copyWith(
+        people: [
+          Person(
+            id: 'p1',
+            displayName: 'Alex',
+            birthDate: DateTime(1985, 6, 15),
+            taxUnitId: 'tu1',
+            employerHealthCoverageEndYear: DateTime.now().year - 1,
+          ),
+        ],
+      );
+      await pumpApp(tester, ready: true, household: early);
+      await tapRail(tester, 'Breakdown');
+
+      expect(
+          find.text('Health coverage, which the plan works out for itself'),
+          findsOneWidget);
+      expect(find.textContaining('counted twice'), findsOneWidget);
+    });
+
+    testWidgets('spending more in retirement raises what it says you need',
+        (tester) async {
+      // The report: adding \$100,000 a year of retirement spending left the
+      // drawdown figure unmoved, because it was built on what the pot
+      // supports rather than on what retirement costs.
+      Household withExtra(bool extra) => readyHousehold().copyWith(
+            expenseItems: [
+              ...readyHousehold().expenseItems,
+              if (extra)
+                ExpenseItem(
+                  id: 'splurge',
+                  categoryId: 'cat',
+                  label: 'Three big years',
+                  amount: Money.dollars(100000),
+                  frequency: ExpenseFrequency.annual,
+                  startYear: DateTime.now().year + 18,
+                  endYear: DateTime.now().year + 20,
+                ),
+            ],
+          );
+
+      Money need(ProviderContainer c) =>
+          c.read(projectionProvider).requireValue.expected.fireNumber!;
+      Money cost(ProviderContainer c) => c
+          .read(projectionProvider)
+          .requireValue
+          .expected
+          .levelEquivalentRetirementExpenses!;
+
+      final plain = await pumpApp(tester, ready: true,
+          household: withExtra(false));
+      final plainNeed = need(plain);
+      final plainCost = cost(plain);
+
+      final more =
+          await pumpApp(tester, ready: true, household: withExtra(true));
+      expect(cost(more).cents, greaterThan(plainCost.cents));
+      expect(need(more).cents, greaterThan(plainNeed.cents));
+    });
+
+    testWidgets('spending that ends before retirement is called out',
+        (tester) async {
+      // Otherwise adding college looks like the calculator ignoring it.
+      // Retiring well after the college years, which is the case where the
+      // target legitimately does not move.
+      final h = readyHousehold().copyWith(
+        accounts: [
+          Account(
+            id: 'brokerage',
+            personId: 'p1',
+            label: 'Brokerage',
+            kind: AccountKind.taxableBrokerage,
+            taxTreatment: TaxTreatment.taxable,
+            limitFamily: LimitFamily.none,
+            balance: Money.dollars(700000),
+            costBasis: Money.dollars(500000),
+            isRestrictedPurpose: false,
+            assetAllocationId: 'usStocks',
+            contribution: const Contribution(
+                mode: ContributionMode.fixedAmount, value: 0),
+          ),
+        ],
+        incomeStreams: [
+          IncomeStream(
+            id: 'inc',
+            personId: 'p1',
+            label: 'Salary',
+            kind: IncomeKind.w2Wages,
+            grossAnnualAmount: Money.dollars(160000),
+            isFicaSubject: true,
+            isQualifiedBusinessIncome: false,
+          ),
+        ],
+      );
+      final withCollege = h.copyWith(
+        expenseCategories: [
+          ...h.expenseCategories,
+          const ExpenseCategory(
+              id: 'edu',
+              householdId: 'h1',
+              label: 'Education',
+              metaCategory: MetaCategory.education),
+        ],
+        expenseItems: [
+          ...h.expenseItems,
+          ExpenseItem(
+            id: 'college',
+            categoryId: 'edu',
+            label: 'College',
+            amount: Money.dollars(50000),
+            frequency: ExpenseFrequency.annual,
+            startYear: DateTime.now().year + 2,
+            endYear: DateTime.now().year + 4,
+          ),
+        ],
+      );
+      await pumpApp(tester, ready: true, household: withCollege);
+      await tapRail(tester, 'Breakdown');
+
+      expect(find.text('Spending that ends before you retire'), findsOneWidget);
+      expect(find.textContaining('moves the date in question three'),
+          findsOneWidget);
+    });
+
+    testWidgets('a plan with nothing entered says so rather than guessing',
+        (tester) async {
+      await pumpApp(tester);
+      await tapRail(tester, 'Breakdown');
+      expect(find.textContaining('not enough entered yet'), findsWidgets);
     });
   });
 

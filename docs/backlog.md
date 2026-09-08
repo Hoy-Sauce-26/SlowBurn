@@ -33,6 +33,13 @@ flags and saying what they are for. Left until the setup path has been in front
 of people, since it will be obvious afterwards which parts still need pointing
 at.
 
+**Two screens over the same numbers.** `Breakdown` asks the three questions
+somebody actually has and carries the levers beside each answer; `Plan` shows
+the chart, the bands and every assumption in one list. Breakdown is the one to
+keep if only one survives, and Plan holds three things it does not yet: the
+net-worth chart, the three-band comparison, and the assumptions nobody asks
+about in the ordinary case. Worth revisiting once Breakdown has been used.
+
 ## Consistency
 
 **Year fields in the payroll deduction editor** are still typed, where the

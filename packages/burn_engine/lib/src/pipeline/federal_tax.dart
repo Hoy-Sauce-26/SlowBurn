@@ -278,13 +278,29 @@ HealthCredit computeHealthCredit(
       p.ageIn(year) < 65 &&
       year > (p.employerHealthCoverageEndYear ?? -1 << 31));
 
+  // A family buys one policy. Children raise the household size the subsidy
+  // is measured against, so leaving them off the premium made a retiring
+  // family with two of them look cheaper than a couple with none (§4.3.5).
+  // They are priced in the years nobody's job is covering the household.
+  final onEmployerPlan = people.any((p) =>
+      p.ageIn(year) < 65 &&
+      year <= (p.employerHealthCoverageEndYear ?? -1 << 31));
+  final coveredDependents = onEmployerPlan || covered.isEmpty
+      ? const <Dependent>[]
+      : unit.activeDependents(year).toList();
+
   // The fallback sums over nobody, but an entered override does not, so the
   // gate comes first (§4.3.5).
   final benchmarkPremium = covered.isEmpty
       ? Money.zero
       : unit.benchmarkPremiumOverride ??
-          sumMoney(covered.map((p) =>
-              taxYear.acaBenchmarkPremiumByAge[p.ageIn(year)] ?? Money.zero));
+          sumMoney([
+            for (final p in covered)
+              taxYear.acaBenchmarkPremiumByAge[p.ageIn(year)] ?? Money.zero,
+            for (final d in coveredDependents)
+              taxYear.acaBenchmarkPremiumByAge[year - d.birthDate.year] ??
+                  Money.zero,
+          ]);
 
   final aboveFloor = fplPercent >= taxYear.acaMinimumFplPercent;
   final belowCeiling = taxYear.acaMaximumFplPercent == null ||

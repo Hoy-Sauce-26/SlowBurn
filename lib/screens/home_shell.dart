@@ -5,6 +5,7 @@ import '../services/persistence.dart';
 import '../widgets/adaptive_scaffold.dart';
 import '../widgets/results_panel.dart';
 import 'accounts_screen.dart';
+import 'breakdown_screen.dart';
 import 'housing_screen.dart';
 import 'property_screen.dart';
 import 'household_screen.dart';
@@ -96,6 +97,13 @@ class _HomeShellState extends ConsumerState<HomeShell>
       icon: Icons.home_outlined,
       selectedIcon: Icons.home,
       build: () => const PropertyScreen(),
+    ),
+    Destination(
+      // The same numbers as Plan, asked in the order somebody thinks in.
+      label: 'Breakdown',
+      icon: Icons.question_answer_outlined,
+      selectedIcon: Icons.question_answer,
+      build: () => const BreakdownScreen(),
     ),
     Destination(
       label: 'Plan',

@@ -49,6 +49,20 @@ class BandResult {
   final Reachable<int> retirementYear;
 
   final Reachable<Money> fireNumber;
+
+  /// What retirement costs, as §8.1 sizes it: the flat annual amount worth the
+  /// same as the whole projected stream.
+  ///
+  /// The demand side, and not to be confused with [sustainableLevelSpending],
+  /// which is the supply side. They meet at the solved year by construction
+  /// and answer opposite questions: this one moves when spending changes, that
+  /// one moves when the pot does.
+  final Reachable<Money> levelEquivalentRetirementExpenses;
+
+  /// What the first retired year costs, which is the figure a person
+  /// recognises even though the level equivalent is what sizes the plan.
+  final Reachable<Money> retirementAnnualExpenses;
+
   final Reachable<Money> sustainableLevelSpending;
   final Reachable<Money> spendingHeadroom;
 
@@ -63,6 +77,8 @@ class BandResult {
     required this.band,
     required this.retirementYear,
     required this.fireNumber,
+    required this.levelEquivalentRetirementExpenses,
+    required this.retirementAnnualExpenses,
     required this.sustainableLevelSpending,
     required this.spendingHeadroom,
     required this.shortfall,
@@ -148,6 +164,8 @@ BandResult solveRetirement(
       band: band,
       retirementYear: null,
       fireNumber: null,
+      levelEquivalentRetirementExpenses: null,
+      retirementAnnualExpenses: null,
       sustainableLevelSpending: null,
       spendingHeadroom: null,
       shortfall: lastCandidate == null
@@ -186,6 +204,8 @@ BandResult solveRetirement(
     band: band,
     retirementYear: solved,
     fireNumber: fire.fireNumber,
+    levelEquivalentRetirementExpenses: fire.levelEquivalentRetirementExpenses,
+    retirementAnnualExpenses: fire.retirementAnnualExpenses,
     sustainableLevelSpending: sustainable,
     spendingHeadroom:
         sustainable - fire.levelEquivalentRetirementExpenses,

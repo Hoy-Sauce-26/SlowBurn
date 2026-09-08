@@ -72,5 +72,10 @@ average, and 2026 premiums rose steeply. Anyone modelling a bridge to
 Medicare should enter their own benchmark rather than trust it. Tracked in
 [backlog.md](../../docs/backlog.md).
 
+Ages 0 to 20 are derived from the age-21 figure using the federal default age
+curve, which every state but a handful uses: 0.765 of a 21-year-old up to age
+14, then stepping to parity at 21. Children have to be priced, because they
+already count toward the household size the subsidy is measured against.
+
 What the model deliberately leaves out is listed in §13.2 of
 [domain.md](../../docs/domain.md), not here.

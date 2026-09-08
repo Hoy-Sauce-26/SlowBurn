@@ -1027,7 +1027,8 @@ a floor instead (§3.11). Composed of:
   credit ends outright; a null maximum is the regime where it instead tapers to a fixed
   percentage of income and no cliff exists. The schedule has changed shape more than once,
   and interpolation alone cannot represent either edge (§4.3.5)
-- `acaBenchmarkPremiumByAge`: national-average second-lowest-cost-silver-plan annual
+- `acaBenchmarkPremiumByAge`: keyed from age 0, since a dependent is priced as well as an
+  adult. National-average second-lowest-cost-silver-plan annual
   premium by age, the fallback when the user has not entered their local figure. Its index
   needs no extension rule: `covered` (§4.3.5) admits only persons under 65, and the published
   age curve starts at 0. It
@@ -1418,7 +1419,15 @@ An early retiree largely chooses their own income by choosing which accounts to 
 the section: it is the largest expense lever the plan has, and it turns on MAGI rather than
 on the tax the rest of §4.3 computes.
 
-**ACA premium tax credit** (per TaxUnit, only while a covered person is under 65):
+**ACA premium tax credit** (per TaxUnit, only while a covered person is under 65).
+
+**The premium is per head and age-rated**, over everybody the household is buying cover for:
+each person under 65 whose employer coverage has ended, and the dependents alongside them.
+Dependents count on both sides or neither. They raise `taxUnitSize`, which raises the poverty
+line the subsidy is measured against, so pricing the household size without pricing the
+policy would make a family retiring with two children look cheaper than a couple with none.
+A year in which anybody's job still covers the household prices nobody, since that is one
+policy somebody else is paying for.
 
 ```
 acaMagi           = federalAgi + (ssBenefits − taxableSS)   // + tax-exempt interest, not modeled
@@ -1428,9 +1437,13 @@ fplPercent        = 100 × acaMagi / TaxYear.federalPovertyLevel[stateCode][taxU
 
 covered           = persons in this TaxUnit with age(year) < 65
                       and year > employerHealthCoverageEndYear    // §3.1
+onEmployerPlan    = any person under 65 whose employer coverage still runs
+coveredDependents = dependents active this year, and none while onEmployerPlan
+                      or while covered is empty
 benchmarkPremium  = 0                                            if covered is empty
                   = TaxUnit.benchmarkPremiumOverride             // this TaxUnit's own
-                    ?? Σ over covered: TaxYear.acaBenchmarkPremiumByAge[age(year)]
+                    ?? Σ over covered and coveredDependents:
+                         TaxYear.acaBenchmarkPremiumByAge[age(year)]
 
 eligible          = covered is non-empty
                     and fplPercent ≥ TaxYear.acaMinimumFplPercent
@@ -1824,7 +1837,7 @@ the balance down to it, and below it only when every other source is exhausted.
 | `retirementYear`                    | Per `Person`, §3.1: their `plannedRetirementAge` applied to `birthDate`, else the household's. For the household, the year §8.2 solves for.                                                                                                                      |
 | `retirementDurationYears`           | `projectionHorizonAge` − the youngest person's age at the retirement year. During §8.2's search that is the **candidate** year under test, since it feeds both the FIRE number that year is tested against (§8.1) and the `swrHorizonMismatch` check.            |
 | `fireNumber`                        | §8.1                                                                                                                                                                                                                             |
-| `sustainableLevelSpending`          | `afterTaxLiquidNetWorth` projected to the first year of retirement × `safeWithdrawalRate`. The inverse of `fireNumber`: what the plan as entered will support, rather than what a chosen standard of living demands (§9.4). `notReachable` where `retirementYear` is. |
+| `sustainableLevelSpending`          | `afterTaxLiquidNetWorth` projected to the first year of retirement × `safeWithdrawalRate`. The inverse of `fireNumber`: what the plan as entered will support, rather than what a chosen standard of living demands (§9.4). `notReachable` where `retirementYear` is. **Supply, not demand:** it moves when the pot moves, so anything asking what retirement *costs* reads `levelEquivalentRetirementExpenses` instead. The two meet at the solved year by construction, which is what makes the mistake easy. |
 | `spendingHeadroom`                  | `sustainableLevelSpending` − `levelEquivalentRetirementExpenses`. Positive is room to spend more, negative is the annual gap (§9.4). `notReachable` where either side is.                                                                                                                                                                                                                                                             |
 
 **`savingsRate` measures employee contributions only**, excluding employer match (§4.4.1),

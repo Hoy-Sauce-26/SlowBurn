@@ -38,8 +38,14 @@ class TaxUnit {
 
   /// Dependents still supported in [year] (§3.2), which drives head-of-household
   /// qualification and ACA tax-family size.
-  Iterable<Dependent> activeDependents(int year) =>
-      dependents.where((d) => year <= d.resolvedSupportEndYear);
+  /// Dependents this year: born, and still being supported.
+  ///
+  /// A child planned for 2031 is entered now with a birth date then, so the
+  /// span is bounded at both ends. Without the lower bound they would raise
+  /// the household size, the health premium and the Child Tax Credit from the
+  /// day they were typed in (§3.2).
+  Iterable<Dependent> activeDependents(int year) => dependents.where(
+      (d) => year >= d.birthDate.year && year <= d.resolvedSupportEndYear);
 
   /// Dependents under the Child Tax Credit's qualifying age at year end
   /// (§4.3.4). The age itself is tax-year data, so it is passed in.

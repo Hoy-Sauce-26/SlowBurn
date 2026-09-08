@@ -358,9 +358,10 @@ class TaxUnitCard extends ConsumerWidget {
             // household size every subsidy is measured against (§3.2).
             EntitySection(
               title: 'Children and dependants',
-              blurb: 'Each one brings a tax credit while they qualify, and '
-                  'counts toward the household size behind any health '
-                  'subsidy.',
+              blurb: 'Each one brings a tax credit while they qualify, counts '
+                  'toward the household size behind any health subsidy, and '
+                  'is priced on the family policy. Somebody planned for a '
+                  'later year belongs here too, with the year they arrive.',
               addLabel: 'Add a dependant',
               emptyMessage: 'Nobody depending on this return.',
               onAdd: () => _editDependent(context, ref, null),
@@ -368,7 +369,9 @@ class TaxUnitCard extends ConsumerWidget {
                 for (final (index, dependent) in unit.dependents.indexed)
                   EntityTile(
                     icon: Icons.child_care_outlined,
-                    title: 'Born ${dependent.birthDate.year}',
+                    title: dependent.birthDate.year > DateTime.now().year
+                        ? 'Planned for ${dependent.birthDate.year}'
+                        : 'Born ${dependent.birthDate.year}',
                     subtitle: 'supported through '
                         '${dependent.resolvedSupportEndYear}'
                         '${dependent.isStudent ? ' · student' : ''}',
@@ -398,16 +401,21 @@ class TaxUnitCard extends ConsumerWidget {
 
     await showEditor<void>(
       context,
-      title: index == null ? 'Add a dependant' : 'Born $birthYear',
+      title: index == null
+          ? 'Add a dependant'
+          : (birthYear > thisYear ? 'Planned for $birthYear' : 'Born $birthYear'),
       build: (context) => StatefulBuilder(
         builder: (context, setState) => Column(
           children: [
             NumberChoiceField(
               label: 'Born',
-              helper: 'The credit follows their age, and stops the year they '
-                  'turn 17.',
+              helper: birthYear > thisYear
+                  ? 'Not here yet, so they cost nothing and bring no credit '
+                      'until $birthYear.'
+                  : 'The credit follows their age, and stops the year they '
+                      'turn 17.',
               first: thisYear - 30,
-              last: thisYear,
+              last: thisYear + 25,
               descending: true,
               value: birthYear,
               onChanged: (v) => setState(() => birthYear = v ?? thisYear),
@@ -425,9 +433,9 @@ class TaxUnitCard extends ConsumerWidget {
             NumberChoiceField(
               label: 'You support them until',
               helper: 'Left alone, this is the year they turn '
-                  '${isStudent ? 24 : 19}.',
+                  '${isStudent ? 24 : 19}, which is ${birthYear + (isStudent ? 24 : 19)}.',
               first: thisYear,
-              last: thisYear + 40,
+              last: thisYear + 60,
               value: supportEnd,
               noneLabel: 'Work it out for me',
               onChanged: (v) => setState(() => supportEnd = v),

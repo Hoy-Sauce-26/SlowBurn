@@ -75,21 +75,31 @@ Finder dropdown(String label) => find.ancestor(
 /// not, so choosing means opening the field and then taking the last of the
 /// matching items, which is the one the overlay put on top.
 Future<void> pick(WidgetTester tester, String field, String value) async {
-  await tester.tap(dropdown(field).first);
+  // A field only half on screen takes a tap that lands somewhere else, and
+  // since the editor stopped closing on a stray click that shows up as a menu
+  // that never opened.
+  final menu = dropdown(field).first;
+  await tester.ensureVisible(menu);
   await tester.pumpAndSettle();
-  // Two fields on one form can offer the same entry, so the one to tap is
-  // whichever is really on top: the open list's.
+  await tester.tap(menu);
+  await tester.pumpAndSettle();
+
+  // Every entry stays mounted whether its menu is open or not, so the one to
+  // tap is whichever is really on top. Where the open list has scrolled past
+  // it, typing narrows the list until it is there, which is what a person
+  // would do anyway.
   var item = find.widgetWithText(MenuItemButton, value).hitTestable();
   if (item.evaluate().isEmpty) {
-    // An open list scrolls to whatever was already chosen, which can leave
-    // the entry being asked for above the fold.
-    await tester.ensureVisible(find.widgetWithText(MenuItemButton, value).last);
+    await tester.enterText(
+        find.descendant(of: menu, matching: find.byType(TextField)), value);
     await tester.pumpAndSettle();
     item = find.widgetWithText(MenuItemButton, value).hitTestable();
   }
   await tester.tap(item.last);
   await tester.pumpAndSettle();
 }
+
+
 
 /// What a dropdown is currently showing.
 String shown(WidgetTester tester, String field) =>
@@ -484,6 +494,27 @@ void main() {
       expect(
           container.read(householdProvider).assets.single.realAppreciationRate,
           closeTo(-0.10, 1e-9));
+    });
+
+    testWidgets('a child planned for a later year can be entered',
+        (tester) async {
+      final container = await pumpApp(tester, household: withPerson());
+      await go(tester, 'Household');
+      await tester.tap(find.text('Add a dependant'));
+      await tester.pumpAndSettle();
+
+      final born = DateTime.now().year + 4;
+      await pick(tester, 'Born', '$born');
+      expect(find.textContaining('Not here yet'), findsOneWidget);
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final unit = container.read(householdProvider).taxUnits.single;
+      expect(unit.dependents.single.birthDate.year, born);
+      expect(unit.activeDependents(DateTime.now().year), isEmpty);
+      expect(unit.activeDependents(born), hasLength(1));
+      expect(find.text('Planned for $born'), findsOneWidget);
     });
 
     testWidgets('children can be added, having gone missing entirely',
