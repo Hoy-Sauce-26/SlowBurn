@@ -79,9 +79,9 @@ void main() {
     });
 
     test('and one that lands inside retirement moves both', () {
-      final without = solve(plan(pay: 200000, balance: 1500000));
+      final without = solve(plan(pay: 250000, balance: 2200000));
       final with_ = solve(
-          plan(pay: 200000, balance: 1500000, withCollege: true));
+          plan(pay: 250000, balance: 2200000, withCollege: true));
 
       expect(without.retirementYear! < 2044, isTrue,
           reason: 'this household is retired before the college years');
@@ -99,8 +99,8 @@ void main() {
           id: 'h1',
           taxUnits: [taxUnit()],
           people: [person(birthYear: 1985)],
-          incomeStreams: [salary(pay: 200000)],
-          accounts: [brokerageIn(balance: 1500000, basis: 1000000)],
+          incomeStreams: [salary(pay: 250000)],
+          accounts: [brokerageIn(balance: 2200000, basis: 1500000)],
           expenseCategories: const [
             ExpenseCategory(
                 id: 'misc',

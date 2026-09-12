@@ -143,7 +143,10 @@ class NetWorthChart extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'In today\'s money, so a flat line is holding its value rather than '
-          'standing still.',
+          'standing still. Each line retires in its own year and spends from '
+          'then on, so a worse market keeps working and can climb above a '
+          'better one that stopped years earlier. Two lines meeting does not '
+          'mean either could retire then.',
           style: theme.textTheme.bodySmall
               ?.copyWith(color: scheme.onSurfaceVariant),
         ),

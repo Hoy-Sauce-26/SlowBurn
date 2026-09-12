@@ -233,7 +233,10 @@ class AssetClassesNotifier extends Notifier<List<AssetClass>> {
 /// Everything §12 found wrong with the household as entered. Warn-don't-block,
 /// so the projection still runs and the findings ride along (§12).
 final findingsProvider = Provider<List<Finding>>((ref) => [
-      ...validateHousehold(ref.watch(householdProvider)),
+      ...validateHousehold(
+        ref.watch(householdProvider),
+        assetClassIds: {for (final c in ref.watch(assetClassesProvider)) c.id},
+      ),
       ...validateAssumptions(ref.watch(scenarioProvider).assumptions),
     ]);
 
@@ -298,3 +301,49 @@ final flagsProvider = Provider<Set<String>>((ref) {
     orElse: () => <String>{},
   );
 });
+
+/// Which years each flag was raised in.
+///
+/// A caveat about "some years" is one nobody can check. Naming them turns it
+/// into something a person can look at their own plan and reconcile.
+final flagYearsProvider = Provider<Map<String, List<int>>>((ref) {
+  final projection = ref.watch(projectionProvider);
+  return projection.maybeWhen(
+    data: (bands) {
+      final years = <String, List<int>>{};
+      for (final year in bands.expected.finalPass.years) {
+        for (final flag in year.flags) {
+          years.putIfAbsent(flag, () => []).add(year.year);
+        }
+      }
+      return years;
+    },
+    orElse: () => const {},
+  );
+});
+
+/// "2042", "2042 to 2047", or "2042 to 2047 and 2051 to 2053": a run of years
+/// read as spans, since that is how somebody holds them in their head.
+String describeYears(List<int> years) {
+  if (years.isEmpty) return '';
+  final sorted = [...years]..sort();
+  final spans = <(int, int)>[];
+  var from = sorted.first;
+  var to = sorted.first;
+  for (final year in sorted.skip(1)) {
+    if (year == to + 1) {
+      to = year;
+    } else {
+      spans.add((from, to));
+      from = year;
+      to = year;
+    }
+  }
+  spans.add((from, to));
+
+  final parts = [
+    for (final (a, b) in spans) a == b ? '$a' : '$a to $b',
+  ];
+  if (parts.length == 1) return parts.single;
+  return '${parts.take(parts.length - 1).join(', ')} and ${parts.last}';
+}

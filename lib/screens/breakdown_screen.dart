@@ -188,9 +188,18 @@ class _Spending extends ConsumerWidget {
                     '${formatMoney(health.credit)} subsidy, priced from your '
                     'income and household size in that year. Do not add it as '
                     'a spending line, or it will be counted twice.'
-                : 'A ${formatMoney(health.gross)} benchmark policy with no '
-                    'subsidy at this income. Do not add it as a spending '
-                    'line, or it will be counted twice.',
+                : health.belowFloor
+                    ? 'A ${formatMoney(health.gross)} policy with no help at '
+                        'all. Your income that year is '
+                        '${health.fplPercent.round()}% of the federal poverty '
+                        'line, and subsidies start at 100%. Taking a little '
+                        'more income on purpose often costs less in tax than '
+                        'the subsidy it buys back.'
+                    : 'A ${formatMoney(health.gross)} benchmark policy with '
+                        'no subsidy at this income, which is '
+                        '${health.fplPercent.round()}% of the federal poverty '
+                        'line. Do not add it as a spending line, or it will '
+                        'be counted twice.',
           ),
           const Divider(height: 32),
         ],
@@ -232,8 +241,13 @@ class _Spending extends ConsumerWidget {
 
   /// What buying your own cover costs in the first retired year, and what the
   /// subsidy takes off it. Zero where an employer is still paying.
-  static ({Money gross, Money credit, Money net})? _healthAtRetirement(
-      BandResult result) {
+  static ({
+    Money gross,
+    Money credit,
+    Money net,
+    double fplPercent,
+    bool belowFloor,
+  })? _healthAtRetirement(BandResult result) {
     final year = result.retirementYear;
     if (year == null) return null;
     final retired =
@@ -244,7 +258,14 @@ class _Spending extends ConsumerWidget {
     if (!gross.isPositive) return null;
     final credit =
         sumMoney(retired.solved.owed.map((o) => o.health.premiumTaxCredit));
-    return (gross: gross, credit: credit, net: gross - credit);
+    final health = retired.solved.owed.first.health;
+    return (
+      gross: gross,
+      credit: credit,
+      net: gross - credit,
+      fplPercent: health.fplPercent,
+      belowFloor: retired.solved.owed.any((o) => o.health.belowSubsidyFloor),
+    );
   }
 
   /// Everything the household spends that is over before retirement begins.
@@ -659,11 +680,13 @@ class _RetirementHolding extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final notifier = ref.read(householdProvider.notifier);
-    final movable = household.accounts.where((a) => !a.kind.isCash).toList();
+    final movable = household.accounts
+        .where((a) => !a.kind.isCash && a.kind.reachableBeforeFiftyNineHalf)
+        .toList();
     if (movable.isEmpty) {
       return Text(
-        'Once there are accounts here, this is where you say what they move '
-        'into at retirement.',
+        'Once you hold something you can spend before 59½, this is where you '
+        'say what it moves into at retirement.',
         style: theme.textTheme.bodySmall
             ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
       );
@@ -675,12 +698,13 @@ class _RetirementHolding extends ConsumerWidget {
 
     return SearchableField<AssetClass>(
       key: ValueKey('retire$shared$mixed'),
-      label: 'What you move into at retirement',
+      label: 'What your early-retirement money moves into',
       helper: mixed
-          ? 'Your accounts differ. Choosing here sets all '
+          ? 'These accounts differ. Choosing here sets all '
               '${movable.length} of them.'
-          : 'Sets all ${movable.length} of your invested accounts, and with '
-              'them the rate the two figures above use. Cash stays put.',
+          : 'The ${movable.length} you can spend from before 59½, which is '
+              'what an early retirement lives on. A locked retirement account '
+              'has years to recover and is left where it is.',
       values: classes,
       value: classes.where((c) => c.id == shared).firstOrNull,
       noneLabel: mixed ? 'Mixed' : 'Leave everything where it is',

@@ -354,10 +354,14 @@ class AccountsScreen extends ConsumerWidget {
                   SearchableField<AssetClass>(
                     key: ValueKey(retirementAllocationId),
                     label: 'And once retired',
-                    helper: 'Selling shares into a bad year is what sends '
-                        'people back to work, so most plans hold less of them '
-                        'by then. Left where it is, the projection earns a '
-                        'working-life return through a whole retirement.',
+                    helper: kind.reachableBeforeFiftyNineHalf
+                        ? 'This is money you can spend before 59½, so it is '
+                            'what an early retirement lives on and what a bad '
+                            'first decade would hurt. Most plans hold less in '
+                            'shares here by then.'
+                        : 'Locked until 59½, so an early retirement never '
+                            'touches it and it has years to ride out a bad '
+                            'decade. Usually left where it is.',
                     values: classes,
                     value: classes
                         .where((c) => c.id == retirementAllocationId)
@@ -525,6 +529,9 @@ Id defaultClassFor(AccountKind kind, List<AssetClass> classes) {
 /// A suggestion rather than a rule. Somebody who means to stay in shares can
 /// say so, and will then be reading a number that knows they did.
 Id? conservativeClassFor(AccountKind kind, List<AssetClass> classes) {
-  if (kind.isCash) return null;
+  // Only the money the first fifteen years are spent from. A 401(k) nobody
+  // can touch until 59½ has fifteen more years to ride out a bad decade, and
+  // derisking it at 45 costs real growth for no protection.
+  if (kind.isCash || !kind.reachableBeforeFiftyNineHalf) return null;
   return classes.where((c) => c.label == AssetClassLabel.bonds).firstOrNull?.id;
 }

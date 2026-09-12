@@ -15,6 +15,7 @@ export 'src/entities/expenses.dart';
 export 'src/entities/household.dart';
 export 'src/entities/income.dart';
 export 'src/entities/payroll.dart';
+export 'src/entities/retirement_defaults.dart';
 export 'src/entities/person.dart';
 export 'src/entities/property.dart';
 export 'src/entities/snapshot.dart';

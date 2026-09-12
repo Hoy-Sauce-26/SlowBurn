@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:burn_engine/burn_engine.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,7 @@ import 'package:slow_burn/services/readiness.dart';
 import 'package:slow_burn/theme/app_theme.dart';
 import 'package:slow_burn/widgets/fields.dart';
 import 'package:slow_burn/widgets/net_worth_chart.dart';
+import 'package:slow_burn/widgets/results_panel.dart';
 
 final taxYear =
     parseTaxYear(File('assets/tax_years/2026.json').readAsStringSync());
@@ -361,14 +363,13 @@ void main() {
       await tapRail(tester, 'Breakdown');
       // A dropdown renders its label twice, so this scrolls to the first.
       await tester.scrollUntilVisible(
-          find.text('What you move into at retirement').first, 200,
+          find.text('What your early-retirement money moves into').first, 200,
           scrollable: find.byType(Scrollable).first);
 
-      await pick(tester, 'What you move into at retirement', 'Bonds');
-      for (final a in container
-          .read(householdProvider)
-          .accounts
-          .where((a) => !a.kind.isCash)) {
+      await pick(
+          tester, 'What your early-retirement money moves into', 'Bonds');
+      for (final a in container.read(householdProvider).accounts.where(
+          (a) => a.kind.reachableBeforeFiftyNineHalf && !a.kind.isCash)) {
         expect(a.retirementAllocationId, 'bonds');
       }
     });
@@ -426,6 +427,60 @@ void main() {
           find.text('Health coverage, which the plan works out for itself'),
           findsOneWidget);
       expect(find.textContaining('counted twice'), findsOneWidget);
+    });
+
+    testWidgets('a plan under the poverty line says how far under it is',
+        (tester) async {
+      // "Below the subsidy floor" says nothing anybody can act on. The number
+      // and the threshold together do.
+      final lean = readyHousehold().copyWith(
+        people: [
+          Person(
+            id: 'p1',
+            displayName: 'Alex',
+            birthDate: DateTime(1985, 6, 15),
+            taxUnitId: 'tu1',
+            employerHealthCoverageEndYear: DateTime.now().year - 1,
+          ),
+        ],
+        expenseItems: [
+          ExpenseItem(
+            id: 'exp',
+            categoryId: 'cat',
+            label: 'Everything else',
+            amount: Money.dollars(9000),
+            frequency: ExpenseFrequency.annual,
+          ),
+        ],
+      );
+      await pumpApp(tester, ready: true, household: lean);
+      await tapRail(tester, 'Breakdown');
+
+      expect(find.textContaining('of the federal poverty line'),
+          findsOneWidget);
+    });
+
+    testWidgets('the flag explains itself in words somebody can act on',
+        (tester) async {
+      expect(flagLabels['acaMagiBelowSubsidyFloor'], 'No health subsidy');
+      final why = flagExplanations['acaMagiBelowSubsidyFloor']!;
+      expect(why, contains('federal poverty line'));
+      expect(why, contains('Medicaid'));
+      expect(why, contains('Roth conversion'));
+      expect(why, isNot(contains('subsidy floor')),
+          reason: 'naming the jargon is not explaining it');
+      expect(why, contains('cannot model that fix yet'),
+          reason: 'a warning with no lever in the app has to say so');
+    });
+
+    test('flag years read as spans rather than a list of numbers', () {
+      expect(describeYears([2042]), '2042');
+      expect(describeYears([2042, 2043, 2044]), '2042 to 2044');
+      expect(describeYears([2044, 2042, 2043]), '2042 to 2044',
+          reason: 'the loop does not promise an order');
+      expect(describeYears([2042, 2043, 2047]), '2042 to 2043 and 2047');
+      expect(describeYears([2042, 2044, 2046]), '2042, 2044 and 2046');
+      expect(describeYears([]), '');
     });
 
     testWidgets('spending more in retirement raises what it says you need',
@@ -540,6 +595,28 @@ void main() {
     });
   });
 
+  group('the chart says which plan each line is', () {
+    testWidgets('three plain lines, and the caption says why they cross',
+        (tester) async {
+      // A pessimistic line climbing above an expected one is somebody still
+      // at work, not a mistake. Marking the retirement years on the lines
+      // themselves made the chart harder to read, so the caption carries it.
+      await pumpApp(tester, ready: true);
+      await tapRail(tester, 'Plan');
+
+      final chart = tester.widget<LineChart>(find.byType(LineChart));
+      expect(chart.data.lineBarsData, hasLength(3));
+      for (final bar in chart.data.lineBarsData) {
+        expect(bar.dotData.show, isFalse,
+            reason: 'a dot per line is clutter at this density');
+      }
+      expect(
+          find.textContaining('Two lines meeting does not mean either could '
+              'retire then'),
+          findsOneWidget);
+    });
+  });
+
   group('the withdrawal rate explains itself', () {
     testWidgets('it says how long the money has to last', (tester) async {
       await pumpApp(tester, ready: true);
@@ -608,24 +685,61 @@ void main() {
     });
   });
 
-  group('what you hold once retired', () {
+  group('what your early-retirement money holds', () {
     testWidgets('is set once for the whole plan, not account by account',
         (tester) async {
       final container = await pumpApp(tester, ready: true);
       await tapRail(tester, 'Plan');
       await tester.scrollUntilVisible(
-          find.text('What you hold once retired'), 300,
+          find.text('What your early-retirement money holds'), 300,
           scrollable: find.byType(Scrollable).first);
 
       await pick(tester, 'Move investments into', 'Bonds');
-      final accounts = container
+      final reachable = container
           .read(householdProvider)
           .accounts
-          .where((a) => !a.kind.isCash);
-      expect(accounts, isNotEmpty);
-      for (final a in accounts) {
+          .where((a) => a.kind.reachableBeforeFiftyNineHalf && !a.kind.isCash);
+      expect(reachable, isNotEmpty);
+      for (final a in reachable) {
         expect(a.retirementAllocationId, 'bonds');
       }
+    });
+
+    testWidgets('and leaves money locked until 59½ where it is',
+        (tester) async {
+      // Derisking a 401(k) at 45 costs growth and protects nothing: nobody
+      // can spend it for fifteen years.
+      final withBoth = readyHousehold().copyWith(
+        accounts: [
+          ...readyHousehold().accounts,
+          Account(
+            id: 'k',
+            personId: 'p1',
+            label: '401(k)',
+            kind: AccountKind.traditional401k,
+            taxTreatment: TaxTreatment.taxDeferred,
+            limitFamily: LimitFamily.electiveDeferral,
+            balance: Money.dollars(800000),
+            isRestrictedPurpose: false,
+            assetAllocationId: 'usStocks',
+            contribution: const Contribution(
+                mode: ContributionMode.fixedAmount, value: 0),
+          ),
+        ],
+      );
+      final container =
+          await pumpApp(tester, ready: true, household: withBoth);
+      await tapRail(tester, 'Plan');
+      await tester.scrollUntilVisible(
+          find.text('What your early-retirement money holds'), 300,
+          scrollable: find.byType(Scrollable).first);
+
+      await pick(tester, 'Move investments into', 'Bonds');
+      final locked = container
+          .read(householdProvider)
+          .accounts
+          .firstWhere((a) => a.id == 'k');
+      expect(locked.retirementAllocationId, isNull);
     });
 
     testWidgets('and can be put back to leaving everything alone',
@@ -633,7 +747,7 @@ void main() {
       final container = await pumpApp(tester, ready: true);
       await tapRail(tester, 'Plan');
       await tester.scrollUntilVisible(
-          find.text('What you hold once retired'), 300,
+          find.text('What your early-retirement money holds'), 300,
           scrollable: find.byType(Scrollable).first);
 
       await pick(tester, 'Move investments into', 'Bonds');

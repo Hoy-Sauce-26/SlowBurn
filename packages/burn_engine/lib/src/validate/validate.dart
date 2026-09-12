@@ -15,7 +15,12 @@ import '../enums.dart';
 import '../types.dart';
 import 'finding.dart';
 
-List<Finding> validateHousehold(Household h) {
+List<Finding> validateHousehold(
+  Household h, {
+  /// The classes that exist, where the caller knows them. Omitted, the
+  /// allocation check is skipped rather than guessed at.
+  Set<Id>? assetClassIds,
+}) {
   final findings = <Finding>[];
   void report(int n, Severity s, String m, [String? id]) =>
       findings.add(Finding(n, s, m, entityId: id));
@@ -175,6 +180,26 @@ List<Finding> validateHousehold(Household h) {
   for (final l in h.liabilities) {
     nonNegative('"${l.label}" balance', l.currentBalance, l.id);
     nonNegative('"${l.label}" payment', l.monthlyPayment, l.id);
+  }
+
+  // 12a. An account names an asset class that is there. A missing one blends
+  //      to a zero return, so the account simply stops growing and nothing
+  //      says why: the quietest way a projection can be wrong.
+  for (final a in h.accounts) {
+    for (final id in [
+      if (a.allocationMode == AllocationMode.singleClass) a.assetAllocationId,
+      a.retirementAllocationId,
+      if (a.allocationMode == AllocationMode.weighted)
+        for (final w in a.allocationWeights) w.assetClassId,
+    ]) {
+      if (id == null ||
+          assetClassIds == null ||
+          assetClassIds.contains(id)) {
+        continue;
+      }
+      report(12, Severity.blocking,
+          '"${a.label}" is invested in something that is not there', a.id);
+    }
   }
 
   // 12b. A housing cost names a home that exists: a primaryResidence Asset or

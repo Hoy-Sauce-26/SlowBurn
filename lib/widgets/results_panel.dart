@@ -224,7 +224,7 @@ const flagLabels = <String, String>{
   'waterfallNotConverged': 'Allocation unsettled',
   'bridgeGapDetected': 'Bridge gap',
   'magiCeilingBreached': 'Subsidy lost',
-  'acaMagiBelowSubsidyFloor': 'Below subsidy floor',
+  'acaMagiBelowSubsidyFloor': 'No health subsidy',
   'retirementSpendingNotLevel': 'Spending changes',
   'rothRolloverAssumed': 'Roth rollover assumed',
   'earningsTestNotModeled': 'Earnings test',
@@ -257,9 +257,18 @@ const flagExplanations = <String, String>{
   'magiCeilingBreached':
       'Funding the year required income that costs some ACA subsidy.',
   'acaMagiBelowSubsidyFloor':
-      'Income sits below the subsidy floor, where the real programme pays '
-          'nothing. Medicaid or realising some income deliberately are the '
-          'real options.',
+      'Help with health insurance starts at the federal poverty line, and in '
+          'some years this plan earns less than that. Under the line the '
+          'marketplace pays nothing at all: in states that expanded Medicaid '
+          'you would be covered by that instead, and in the states that did '
+          'not you would be buying at full price.\n\n'
+          'Early retirees hit this by keeping taxable income very low, which '
+          'is otherwise the right instinct. Taking a little more on purpose, '
+          'through a Roth conversion or by realising some gains, often costs '
+          'less in tax than the subsidy it buys back.\n\n'
+          'This app cannot model that fix yet, so it is telling you about a '
+          'real cost it has already priced rather than one you can adjust '
+          'here. The premium in these years is the full one.',
   'retirementSpendingNotLevel':
       'Spending changes across retirement, so the plan is sized on the level '
           'equivalent rather than the first year.',

@@ -30,6 +30,7 @@ class _FlagBannerState extends ConsumerState<FlagBanner> {
   Widget build(BuildContext context) {
     final flags = flagsFor(widget.home, ref.watch(flagsProvider));
     if (flags.isEmpty) return const SizedBox.shrink();
+    final years = ref.watch(flagYearsProvider);
 
     final theme = Theme.of(context);
     final sorted = flags.toList()..sort();
@@ -83,7 +84,10 @@ class _FlagBannerState extends ConsumerState<FlagBanner> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  flagLabels[flag] ?? flag,
+                                  years[flag] == null
+                                      ? flagLabels[flag] ?? flag
+                                      : '${flagLabels[flag] ?? flag} · '
+                                          '${describeYears(years[flag]!)}',
                                   style: theme.textTheme.labelMedium?.copyWith(
                                       color: theme
                                           .colorScheme.onTertiaryContainer),

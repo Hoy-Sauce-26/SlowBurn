@@ -100,6 +100,26 @@ void main() {
     });
   });
 
+  group('an allocation that is not there', () {
+    test('an account invested in a missing class is caught', () {
+      // It blends to a zero return, so the account silently stops growing.
+      // Found by a fixture naming a class the defaults do not have.
+      expect(
+          numbersFrom(validateHousehold(_invested('stocks'),
+              assetClassIds: {'usStocks'})),
+          contains(12));
+    });
+
+    test('and left alone when the class is there', () {
+      expect(validateHousehold(_invested('stocks'),
+          assetClassIds: {'stocks'}), isEmpty);
+    });
+
+    test('a caller that does not know the classes is not guessed at', () {
+      expect(validateHousehold(_invested('stocks')), isEmpty);
+    });
+  });
+
   group('a share of nothing', () {
     test('an account nobody pays into needs no salary behind it', () {
       // What it looked like in the app: a spouse's old TSP, dormant, with no
@@ -358,3 +378,26 @@ void main() {
     });
   });
 }
+
+/// A household holding one account invested in [classId].
+Household _invested(Id classId) => Household(
+      id: 'h1',
+      taxUnits: [taxUnit()],
+      people: [person()],
+      accounts: [
+        Account(
+          id: 'acct',
+          personId: 'p1',
+          label: 'Brokerage',
+          kind: AccountKind.taxableBrokerage,
+          taxTreatment: TaxTreatment.taxable,
+          limitFamily: LimitFamily.none,
+          balance: Money.dollars(100000),
+          costBasis: Money.dollars(60000),
+          isRestrictedPurpose: false,
+          assetAllocationId: classId,
+          contribution:
+              const Contribution(mode: ContributionMode.fixedAmount, value: 0),
+        ),
+      ],
+    );

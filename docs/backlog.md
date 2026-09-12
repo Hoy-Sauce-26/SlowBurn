@@ -40,6 +40,14 @@ keep if only one survives, and Plan holds three things it does not yet: the
 net-worth chart, the three-band comparison, and the assumptions nobody asks
 about in the ordinary case. Worth revisiting once Breakdown has been used.
 
+**Nothing in the app answers `acaMagiBelowSubsidyFloor`.** The flag names a
+real, already-priced cost: below the federal poverty line the marketplace pays
+nothing, and the plan is charged the full premium. The remedy is a Roth
+conversion or a deliberate realisation of gains, and §13.3 defers conversion
+ladders, so a person reading the warning has nowhere to go inside the app. The
+flag says so rather than implying an adjustment exists. Whichever lands first,
+conversions or a "realise this much income" input, closes it.
+
 ## Consistency
 
 **Year fields in the payroll deduction editor** are still typed, where the

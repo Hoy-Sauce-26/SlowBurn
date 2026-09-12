@@ -147,8 +147,12 @@ class PlanScreen extends ConsumerWidget {
                 scenario, (a) => _copy(a, generalInflationRate: v))),
           ),
           PercentField(
-            label: 'High-interest debt above',
-            helper: 'Real, so it compares against real returns',
+            label: 'Pay debt off before investing, above',
+            helper: 'A debt costing more than this is paid down before any '
+                'spare money is invested, because clearing an 8% loan beats a '
+                '5% return with none of the risk. Above inflation, like every '
+                'other rate here, so a 7% mortgage at 2.5% inflation counts '
+                'as 4.4%.',
             initial: scenario.assumptions.highInterestDebtThresholdRate,
             onChanged: (v) => notifier.replace(_with(scenario,
                 (a) => _copy(a, highInterestDebtThresholdRate: v))),
@@ -362,8 +366,12 @@ class _RetirementHoldings extends ConsumerWidget {
     final household = ref.watch(householdProvider);
     final notifier = ref.read(householdProvider.notifier);
 
-    final movable =
-        household.accounts.where((a) => !a.kind.isCash).toList();
+    // Only the money an early retirement actually spends. A 401(k) locked
+    // until 59½ has years to ride out a bad decade, so moving it to bonds at
+    // 45 costs growth and protects nothing.
+    final movable = household.accounts
+        .where((a) => !a.kind.isCash && a.kind.reachableBeforeFiftyNineHalf)
+        .toList();
     if (movable.isEmpty) return const SizedBox.shrink();
 
     // The shared answer, or null where accounts disagree, which they can only
@@ -375,13 +383,15 @@ class _RetirementHoldings extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('What you hold once retired', style: theme.textTheme.titleMedium),
+        Text('What your early-retirement money holds',
+            style: theme.textTheme.titleMedium),
         const SizedBox(height: 4),
         Text(
           'Selling shares into a bad year is what sends people back to work, '
-          'so most plans hold less of them by retirement. Leave everything '
-          'where it is and the projection earns a working-life return through '
-          'the whole of a retirement, which is the optimistic answer.',
+          'so most plans hold less of them by retirement. This covers the '
+          'money you can spend before 59½ and nothing else: a 401(k) locked '
+          'until then has years to recover, and derisking it early costs '
+          'growth for no protection. Each account can still be set on its own.',
           style: theme.textTheme.bodySmall
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
@@ -390,10 +400,11 @@ class _RetirementHoldings extends ConsumerWidget {
           key: ValueKey('$shared$mixed'),
           label: 'Move investments into',
           helper: mixed
-              ? 'Your accounts differ. Choosing here sets all '
+              ? 'These accounts differ. Choosing here sets all '
                   '${movable.length} of them.'
-              : 'Applies to all ${movable.length} of your invested accounts. '
-                  'Cash stays where it is.',
+              : 'Applies to the ${movable.length} you can spend from before '
+                  '59½: brokerage and Roth IRA. Cash and locked retirement '
+                  'accounts are left alone.',
           values: classes,
           value: classes.where((c) => c.id == shared).firstOrNull,
           noneLabel: mixed ? 'Mixed' : 'Leave everything where it is',

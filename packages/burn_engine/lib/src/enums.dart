@@ -57,6 +57,16 @@ enum AccountKind {
   /// Money in a bank rather than an investment. Every dollar of it has already
   /// been taxed, so there is no unrealised gain in it to tax again (§6.3).
   bool get isCash => this == cashSavings || this == cashChecking;
+
+  /// Whether this can be spent before 59½ without a penalty, which is what
+  /// §8.3's bridge is funded from.
+  ///
+  /// It is also what decides which money derisks at retirement: the pot being
+  /// spent in the first fifteen years is the one a bad decade would hurt, and
+  /// a 401(k) nobody can touch until 59½ has fifteen more years to recover
+  /// (§3.9).
+  bool get reachableBeforeFiftyNineHalf =>
+      isCash || this == taxableBrokerage || this == rothIra;
 }
 
 enum TaxTreatment { taxDeferred, roth, taxable, hsaTriple, educationTaxFree }

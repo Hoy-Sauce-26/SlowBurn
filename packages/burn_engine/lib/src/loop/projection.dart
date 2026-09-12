@@ -12,6 +12,7 @@ import 'dart:math' as math;
 
 import '../entities/assumptions.dart';
 import '../entities/household.dart';
+import '../entities/retirement_defaults.dart';
 import '../pipeline/income_tax.dart';
 import '../pipeline/year.dart';
 import '../pipeline/allocation.dart';
@@ -86,6 +87,11 @@ Projection project(
 }) {
   final currentYear = asOfDate.year;
   final horizon = horizonYear(household, assumptions, currentYear);
+
+  // §3.3: earned income, payroll deferrals and payroll deductions end with the
+  // job unless somebody said otherwise. That is a default rather than a stored
+  // value, so it is resolved here, once, before anything reads a span.
+  household = withRetirementDefaults(household, retirementYear);
 
   final accounts = {
     for (final a in household.accounts) a.id: AccountState(a),
