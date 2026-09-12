@@ -108,6 +108,12 @@ typedef Reachable<T> = T?;
 
 /// A dependent of a `TaxUnit` (§3.2).
 class Dependent {
+  /// What education spending and a 529 name to say whose they are.
+  final Id id;
+
+  /// Optional, and only ever shown: a child is found by [id].
+  final String? name;
+
   final DateTime birthDate;
   final bool isStudent;
 
@@ -115,6 +121,8 @@ class Dependent {
   final int? supportEndYear;
 
   const Dependent({
+    required this.id,
+    this.name,
     required this.birthDate,
     this.isStudent = false,
     this.supportEndYear,

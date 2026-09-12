@@ -116,6 +116,8 @@ Map<String, dynamic> _taxUnit(TaxUnit t) => {
       'localityCode': t.localityCode,
       'dependents': t.dependents
           .map((d) => {
+                'id': d.id,
+                'name': d.name,
                 'birthDate': d.birthDate.toIso8601String(),
                 'isStudent': d.isStudent,
                 'supportEndYear': d.supportEndYear,
@@ -185,6 +187,7 @@ Map<String, dynamic> _account(Account a) => {
           .toList(),
       'isRestrictedPurpose': a.isRestrictedPurpose,
       'targetBalanceMonths': a.targetBalanceMonths,
+      'beneficiaryId': a.beneficiaryId,
     };
 
 Map<String, dynamic> _contribution(Contribution c) => {
@@ -302,6 +305,7 @@ Map<String, dynamic> _item(ExpenseItem i) => {
       'phase': i.phase.name,
       'postRetirementAmount': _cn(i.postRetirementAmount),
       'housingId': i.housingId,
+      'dependentId': i.dependentId,
     };
 
 Map<String, dynamic> _event(OneTimeEvent e) => {
@@ -412,11 +416,16 @@ TaxUnit _readTaxUnit(Map<String, dynamic> j) => TaxUnit(
       filingStatus: _enum(FilingStatus.values, j['filingStatus']),
       stateCode: j['stateCode'] as String,
       localityCode: j['localityCode'] as String?,
+      // Dependants saved before they had ids get one from their position,
+      // which holds until the first save writes it down.
       dependents: _list(j['dependents'])
-          .map((d) => Dependent(
-                birthDate: _date(d['birthDate']),
-                isStudent: d['isStudent'] as bool? ?? false,
-                supportEndYear: d['supportEndYear'] as int?,
+          .indexed
+          .map((e) => Dependent(
+                id: e.$2['id'] as String? ?? '${j['id']}-dependent-${e.$1}',
+                name: e.$2['name'] as String?,
+                birthDate: _date(e.$2['birthDate']),
+                isStudent: e.$2['isStudent'] as bool? ?? false,
+                supportEndYear: e.$2['supportEndYear'] as int?,
               ))
           .toList(),
       benchmarkPremiumOverride: _mn(j['benchmarkPremiumOverride']),
@@ -500,6 +509,7 @@ Account _readAccount(Map<String, dynamic> j) {
             ))
         .toList(),
     isRestrictedPurpose: j['isRestrictedPurpose'] as bool,
+    beneficiaryId: j['beneficiaryId'] as String?,
     targetBalanceMonths: (j['targetBalanceMonths'] as num?)?.toDouble(),
   );
 }
@@ -625,6 +635,7 @@ ExpenseItem _readItem(Map<String, dynamic> j) => ExpenseItem(
       phase: _enum(ExpensePhase.values, j['phase']),
       postRetirementAmount: _mn(j['postRetirementAmount']),
       housingId: j['housingId'] as String?,
+      dependentId: j['dependentId'] as String?,
     );
 
 OneTimeEvent _readEvent(Map<String, dynamic> j) => OneTimeEvent(

@@ -216,6 +216,7 @@ TaxOwed computeTaxOwed(
     unitAccounts: household.accounts
         .where((a) => personIds.contains(a.personId))
         .toList(),
+    contributions: inputs.resolvedContributions,
   );
   final localTax = unit.localityCode == null
       ? Money.zero
@@ -356,6 +357,7 @@ Money _jurisdictionTax(
   required TaxableIncome income,
   required List<Account> unitAccounts,
   required FilingStatus status,
+  Map<Id, Money> contributions = const {},
 }) {
   if (rules == null || rules.leviesNoIncomeTax) return Money.zero;
 
@@ -373,16 +375,38 @@ Money _jurisdictionTax(
   final exclusion =
       _minOf([rules.retirementIncomeExclusionFor(status), retirementIncome]);
 
+  // What goes into a 529 this year, capped as the state caps it: per child
+  // where it says per beneficiary, and not at all above its income limit.
+  var counted529 = Money.zero;
+  final benefit = rules.education529;
+  final limit = benefit?.incomeLimitFor(status);
+  if (benefit != null && (limit == null || income.federalAgi <= limit)) {
+    final byChild = <Id, Money>{};
+    for (final a in unitAccounts.where((a) => a.isRestrictedPurpose)) {
+      final key = benefit.perBeneficiary ? (a.beneficiaryId ?? a.id) : '';
+      byChild[key] =
+          (byChild[key] ?? Money.zero) + (contributions[a.id] ?? Money.zero);
+    }
+    final cap = benefit.capFor(status);
+    counted529 = sumMoney(
+        byChild.values.map((c) => cap == null ? c : minMoney(c, cap)));
+  }
+  final deduction529 = benefit?.creditRate == null ? counted529 : Money.zero;
+  final credit529 = benefit?.creditRate == null
+      ? Money.zero
+      : counted529 * benefit!.creditRate!;
+
   final taxable = (base -
           rules.standardDeductionFor(status) -
           rules.personalExemptionFor(status) -
-          exclusion)
+          exclusion -
+          deduction529)
       .orZeroIfNegative;
 
   final tax = rules.flatRate != null
       ? taxable * rules.flatRate!
       : applyBrackets(taxable, rules.bracketsFor(status));
-  return (tax - rules.personalCreditFor(status)).orZeroIfNegative;
+  return (tax - rules.personalCreditFor(status) - credit529).orZeroIfNegative;
 }
 
 Money _minOf(List<Money> values) =>

@@ -84,6 +84,23 @@ class HouseholdNotifier extends Notifier<Household> {
   void removeTaxUnit(Id id) => state =
       state.copyWith(taxUnits: _without(state.taxUnits, id, (e) => e.id));
 
+  /// A child taken out of the plan takes their links with them. Their tuition
+  /// and their 529 stay, now for nobody in particular.
+  void removeDependent(Id id) => state = state.copyWith(
+        taxUnits: [
+          for (final t in state.taxUnits)
+            t.withDependents(t.dependents.where((d) => d.id != id).toList()),
+        ],
+        expenseItems: [
+          for (final i in state.expenseItems)
+            i.dependentId == id ? i.withDependent(null) : i,
+        ],
+        accounts: [
+          for (final a in state.accounts)
+            a.beneficiaryId == id ? a.withBeneficiary(null) : a,
+        ],
+      );
+
   void saveEmployer(Employer e) => state =
       state.copyWith(employers: _upsert(state.employers, e, (x) => x.id));
   void removeEmployer(Id id) => state =
@@ -179,6 +196,7 @@ List<ExpenseItem> _followHome(
             phase: item.phase,
             postRetirementAmount: item.postRetirementAmount,
             housingId: item.housingId,
+            dependentId: item.dependentId,
           ),
     ];
 

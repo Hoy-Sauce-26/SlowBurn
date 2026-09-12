@@ -44,6 +44,17 @@ class TaxUnit {
   /// span is bounded at both ends. Without the lower bound they would raise
   /// the household size, the health premium and the Child Tax Credit from the
   /// day they were typed in (§3.2).
+  TaxUnit withDependents(List<Dependent> dependents) => TaxUnit(
+        id: id,
+        householdId: householdId,
+        filingStatus: filingStatus,
+        stateCode: stateCode,
+        localityCode: localityCode,
+        dependents: dependents,
+        benchmarkPremiumOverride: benchmarkPremiumOverride,
+        itemizedDeductionTotal: itemizedDeductionTotal,
+      );
+
   Iterable<Dependent> activeDependents(int year) => dependents.where(
       (d) => year >= d.birthDate.year && year <= d.resolvedSupportEndYear);
 
@@ -146,6 +157,33 @@ class Household {
 
   Iterable<Account> accountsFor(Id personId) =>
       accounts.where((a) => a.personId == personId);
+
+  /// Every dependant across the household's returns.
+  Iterable<Dependent> get dependents => taxUnits.expand((t) => t.dependents);
+
+  /// The first year of the education spending a 529 is for: its
+  /// beneficiary's, or all of it where it names nobody. A line with no start
+  /// year is already being paid.
+  int? firstTuitionYear(Account account) {
+    final meta = {for (final c in expenseCategories) c.id: c.metaCategory};
+    final years = expenseItems
+        .where((i) =>
+            meta[i.categoryId] == MetaCategory.education &&
+            (account.beneficiaryId == null ||
+                i.dependentId == account.beneficiaryId))
+        .map((i) => i.startYear ?? 0);
+    return years.isEmpty ? null : years.reduce((a, b) => a < b ? a : b);
+  }
+
+  /// Whether [account] holds its later allocation in [year] (§3.9): from
+  /// retirement for most, and from the first tuition bill for a 529, which
+  /// is the year its own drawdown starts.
+  bool movedIn(Account account, int year, {required int? retirementYear}) {
+    final from = account.isRestrictedPurpose
+        ? firstTuitionYear(account)
+        : retirementYear;
+    return from != null && year >= from;
+  }
 
   /// Where an unattributed `Asset`, `Liability` or `OneTimeEvent` lands: the
   /// household\'s only tax unit, which exists only while there is exactly one

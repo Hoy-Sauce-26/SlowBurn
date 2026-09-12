@@ -16,8 +16,9 @@ Household everything() => Household(
           stateCode: 'PA',
           localityCode: 'PHL',
           dependents: [
-            Dependent(birthDate: DateTime(2016, 4, 2), isStudent: true),
+            Dependent(id: 'd1', birthDate: DateTime(2016, 4, 2), isStudent: true),
             Dependent(
+              id: 'd2',
                 birthDate: DateTime(2010, 1, 9), supportEndYear: 2032),
           ],
           benchmarkPremiumOverride: Money.dollars(9400),

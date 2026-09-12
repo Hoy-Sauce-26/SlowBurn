@@ -13,13 +13,30 @@ Household plan({
   required int pay,
   required num balance,
   bool withCollege = false,
+  bool with529 = false,
 }) =>
     Household(
       id: 'h1',
       taxUnits: [taxUnit()],
       people: [person(birthYear: 1985)],
       incomeStreams: [salary(pay: pay)],
-      accounts: [brokerageIn(balance: balance, basis: balance * 0.7)],
+      accounts: [
+        brokerageIn(balance: balance, basis: balance * 0.7),
+        if (with529)
+          Account(
+            id: '529',
+            personId: 'p1',
+            label: 'College',
+            kind: AccountKind.education529,
+            taxTreatment: TaxTreatment.educationTaxFree,
+            limitFamily: LimitFamily.education,
+            balance: Money.dollars(200000),
+            isRestrictedPurpose: true,
+            assetAllocationId: 'usStocks',
+            contribution: const Contribution(
+                mode: ContributionMode.fixedAmount, value: 0),
+          ),
+      ],
       expenseCategories: const [
         ExpenseCategory(
             id: 'misc',
@@ -87,6 +104,18 @@ void main() {
           reason: 'this household is retired before the college years');
       expect(with_.fireNumber!.cents > without.fireNumber!.cents, isTrue,
           reason: 'now it is part of what retirement costs');
+    });
+
+    test('unless a 529 pays for it', () {
+      // The 529 sits outside the money retirement is measured on, so the
+      // tuition it pays cannot be in the target too. Counted in both, opening
+      // a 529 made retiring later.
+      final without = solve(plan(pay: 250000, balance: 2200000));
+      final with_ = solve(plan(
+          pay: 250000, balance: 2200000, withCollege: true, with529: true));
+
+      expect(with_.retirementYear, without.retirementYear);
+      expect(with_.fireNumber, without.fireNumber);
     });
   });
 

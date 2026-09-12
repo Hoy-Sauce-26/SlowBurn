@@ -304,7 +304,7 @@ FireNumber _fireNumberAt(
 }) {
   final stream = projection.years
       .where((y) => y.year >= year)
-      .map((y) => y.solved.cashFlow.annualExpenses)
+      .map((y) => y.solved.cashFlow.expensesFromLiquid)
       .toList();
   return computeFireNumber(
     stream: stream,

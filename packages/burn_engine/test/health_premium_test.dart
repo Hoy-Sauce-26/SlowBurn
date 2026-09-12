@@ -24,7 +24,7 @@ Household family({
           stateCode: 'CO',
           dependents: [
             for (var i = 0; i < children; i++)
-              Dependent(birthDate: DateTime(2028 + i, 6, 15)),
+              Dependent(id: 'd$i', birthDate: DateTime(2028 + i, 6, 15)),
           ],
         ),
       ],
@@ -122,7 +122,7 @@ void main() {
               householdId: 'h1',
               filingStatus: FilingStatus.single,
               stateCode: 'CO',
-              dependents: [Dependent(birthDate: DateTime(born, 6, 15))],
+              dependents: [Dependent(id: 'd1', birthDate: DateTime(born, 6, 15))],
             ),
           ],
           people: [

@@ -157,6 +157,12 @@ class Account {
   /// Only meaningful for the household's cash-buffer accounts (§4.5).
   final double? targetBalanceMonths;
 
+  /// For a 529: the child it is saving for, naming a `Dependent`. It decides
+  /// when the account moves into [retirementAllocationId], which for a 529 is
+  /// the year that child's tuition starts rather than the year anyone retires.
+  /// Null counts all education spending.
+  final Id? beneficiaryId;
+
   const Account({
     required this.id,
     required this.personId,
@@ -176,6 +182,7 @@ class Account {
     this.allocationWeights = const [],
     required this.isRestrictedPurpose,
     this.targetBalanceMonths,
+    this.beneficiaryId,
   });
 
   /// What this is moved into once the household retires, and null where it
@@ -212,6 +219,53 @@ class Account {
         allocationWeights: allocationWeights,
         isRestrictedPurpose: isRestrictedPurpose,
         targetBalanceMonths: targetBalanceMonths,
+        beneficiaryId: beneficiaryId,
+      );
+
+  /// The same account, paid into differently.
+  Account withContribution(Contribution contribution) => Account(
+        id: id,
+        personId: personId,
+        label: label,
+        kind: kind,
+        taxTreatment: taxTreatment,
+        limitFamily: limitFamily,
+        balance: balance,
+        costBasis: costBasis,
+        rothContributionBasis: rothContributionBasis,
+        rothFirstContributionYear: rothFirstContributionYear,
+        contribution: contribution,
+        employerId: employerId,
+        allocationMode: allocationMode,
+        assetAllocationId: assetAllocationId,
+        retirementAllocationId: retirementAllocationId,
+        allocationWeights: allocationWeights,
+        isRestrictedPurpose: isRestrictedPurpose,
+        targetBalanceMonths: targetBalanceMonths,
+        beneficiaryId: beneficiaryId,
+      );
+
+  /// The same account, saving for somebody else, or for nobody in particular.
+  Account withBeneficiary(Id? dependentId) => Account(
+        id: id,
+        personId: personId,
+        label: label,
+        kind: kind,
+        taxTreatment: taxTreatment,
+        limitFamily: limitFamily,
+        balance: balance,
+        costBasis: costBasis,
+        rothContributionBasis: rothContributionBasis,
+        rothFirstContributionYear: rothFirstContributionYear,
+        contribution: contribution,
+        employerId: employerId,
+        allocationMode: allocationMode,
+        assetAllocationId: assetAllocationId,
+        retirementAllocationId: retirementAllocationId,
+        allocationWeights: allocationWeights,
+        isRestrictedPurpose: isRestrictedPurpose,
+        targetBalanceMonths: targetBalanceMonths,
+        beneficiaryId: dependentId,
       );
 
   /// The same account, held in something else.
@@ -234,5 +288,6 @@ class Account {
         allocationWeights: allocationWeights,
         isRestrictedPurpose: isRestrictedPurpose,
         targetBalanceMonths: targetBalanceMonths,
+        beneficiaryId: beneficiaryId,
       );
 }

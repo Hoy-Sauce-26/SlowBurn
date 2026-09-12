@@ -43,6 +43,12 @@ class CashFlow {
   /// (§4.4): the cash-buffer target and the FIRE number are both built on it.
   Money get annualExpenses => expenseItemTotal + debtService + healthInsurance;
 
+  /// What ordinary money has to pay for, the 529's share of tuition taken
+  /// out. This is what retirement is sized on (§8.1): a 529 sits outside
+  /// `liquidNetWorth`, so counting the tuition it pays in the target as well
+  /// would charge for it twice.
+  Money get expensesFromLiquid => annualExpenses - education529Draw;
+
   Money get netSurplus =>
       grossIncome +
       oneTimeNet +
@@ -113,8 +119,10 @@ CashFlow computeCashFlow(
             categoryDefaultInflation:
                 categories[i.categoryId]?.defaultRelativeInflation ?? 0,
           )));
-  final restrictedBalance = sumMoney(
-      household.accounts.where((a) => a.isRestrictedPurpose).map((a) => a.balance));
+  final restrictedBalance = inputs.restrictedBalance ??
+      sumMoney(household.accounts
+          .where((a) => a.isRestrictedPurpose)
+          .map((a) => a.balance));
   final education529Draw = minMoney(restrictedBalance, educationSpending);
 
   final debtService = sumMoney(household.liabilities

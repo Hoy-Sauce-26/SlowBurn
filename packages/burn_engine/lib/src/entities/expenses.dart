@@ -63,6 +63,10 @@ class ExpenseItem with Spanned {
   /// deliberately rather than by omission.
   final Id? housingId;
 
+  /// For an `education` item: the child it is for, naming a `Dependent`. It
+  /// is what a 529 for that child is sized against and switches to bonds on.
+  final Id? dependentId;
+
   const ExpenseItem({
     required this.id,
     required this.categoryId,
@@ -77,7 +81,26 @@ class ExpenseItem with Spanned {
     this.phase = ExpensePhase.both,
     this.postRetirementAmount,
     this.housingId,
+    this.dependentId,
   });
+
+  /// The same line, for a different child or for nobody in particular.
+  ExpenseItem withDependent(Id? dependentId) => ExpenseItem(
+        id: id,
+        categoryId: categoryId,
+        label: label,
+        amount: amount,
+        frequency: frequency,
+        startYear: startYear,
+        endYear: endYear,
+        startMonth: startMonth,
+        endMonth: endMonth,
+        relativeInflationRate: relativeInflationRate,
+        phase: phase,
+        postRetirementAmount: postRetirementAmount,
+        housingId: housingId,
+        dependentId: dependentId,
+      );
 
   /// Whether this line is spent in [year], given the household's retirement
   /// year (§3.7). The boundary is the household's, never per person.

@@ -116,6 +116,7 @@ YearResult solveYear(
       annualDepreciation: inputs.annualDepreciation,
       studentLoanInterestPaid: inputs.studentLoanInterestPaid,
       resolvedContributions: resolved,
+      restrictedBalance: inputs.restrictedBalance,
     );
 
     incomes = [

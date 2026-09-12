@@ -1136,6 +1136,12 @@
    "personalExemption": {
     "single": 150000,
     "married": 300000
+   },
+   "education529": {
+    "cap": {
+     "single": 500000,
+     "married": 1000000
+    }
    }
   },
   "AR": {
@@ -1156,6 +1162,12 @@
    "personalCredit": {
     "single": 2900,
     "married": 5800
+   },
+   "education529": {
+    "cap": {
+     "single": 500000,
+     "married": 1000000
+    }
    }
   },
   "AZ": {
@@ -1163,6 +1175,12 @@
    "standardDeduction": {
     "single": 835000,
     "married": 1670000
+   },
+   "education529": {
+    "cap": {
+     "single": 200000,
+     "married": 400000
+    }
    }
   },
   "CA": {
@@ -1266,6 +1284,13 @@
    "standardDeduction": {
     "single": 1610000,
     "married": 3220000
+   },
+   "education529": {
+    "cap": {
+     "single": 2620000,
+     "married": 3920000
+    },
+    "perBeneficiary": true
    }
   },
   "CT": {
@@ -1334,6 +1359,12 @@
    "personalExemption": {
     "single": 1500000,
     "married": 2400000
+   },
+   "education529": {
+    "cap": {
+     "single": 500000,
+     "married": 1000000
+    }
    }
   },
   "DC": {
@@ -1370,6 +1401,12 @@
    "standardDeduction": {
     "single": 1610000,
     "married": 3220000
+   },
+   "education529": {
+    "cap": {
+     "single": 400000,
+     "married": 800000
+    }
    }
   },
   "DE": {
@@ -1410,6 +1447,16 @@
    "personalCredit": {
     "single": 11000,
     "married": 22000
+   },
+   "education529": {
+    "cap": {
+     "single": 100000,
+     "married": 200000
+    },
+    "incomeLimit": {
+     "single": 10000000,
+     "married": 20000000
+    }
    }
   },
   "FL": {
@@ -1420,6 +1467,13 @@
    "standardDeduction": {
     "single": 1200000,
     "married": 2400000
+   },
+   "education529": {
+    "cap": {
+     "single": 400000,
+     "married": 800000
+    },
+    "perBeneficiary": true
    }
   },
   "HI": {
@@ -1543,6 +1597,13 @@
    "personalCredit": {
     "single": 4000,
     "married": 8000
+   },
+   "education529": {
+    "cap": {
+     "single": 610000,
+     "married": 1220000
+    },
+    "perBeneficiary": true
    }
   },
   "ID": {
@@ -1571,6 +1632,12 @@
    "standardDeduction": {
     "single": 1610000,
     "married": 3220000
+   },
+   "education529": {
+    "cap": {
+     "single": 600000,
+     "married": 1200000
+    }
    }
   },
   "IL": {
@@ -1578,6 +1645,12 @@
    "personalExemption": {
     "single": 292500,
     "married": 585000
+   },
+   "education529": {
+    "cap": {
+     "single": 1000000,
+     "married": 2000000
+    }
    }
   },
   "IN": {
@@ -1585,6 +1658,10 @@
    "personalExemption": {
     "single": 100000,
     "married": 200000
+   },
+   "education529": {
+    "cap": 750000,
+    "creditRate": 0.2
    }
   },
   "KS": {
@@ -1617,6 +1694,13 @@
    "personalExemption": {
     "single": 916000,
     "married": 1832000
+   },
+   "education529": {
+    "cap": {
+     "single": 300000,
+     "married": 600000
+    },
+    "perBeneficiary": true
    }
   },
   "KY": {
@@ -1628,6 +1712,13 @@
    "standardDeduction": {
     "single": 1287500,
     "married": 2575000
+   },
+   "education529": {
+    "cap": {
+     "single": 240000,
+     "married": 480000
+    },
+    "perBeneficiary": true
    }
   },
   "MA": {
@@ -1644,6 +1735,12 @@
    "personalExemption": {
     "single": 440000,
     "married": 880000
+   },
+   "education529": {
+    "cap": {
+     "single": 100000,
+     "married": 200000
+    }
    }
   },
   "MD": {
@@ -1740,6 +1837,13 @@
    "personalExemption": {
     "single": 320000,
     "married": 640000
+   },
+   "education529": {
+    "cap": {
+     "single": 250000,
+     "married": 500000
+    },
+    "perBeneficiary": true
    }
   },
   "ME": {
@@ -1780,6 +1884,14 @@
    "personalExemption": {
     "single": 530000,
     "married": 1060000
+   },
+   "education529": {
+    "cap": 100000,
+    "perBeneficiary": true,
+    "incomeLimit": {
+     "single": 10000000,
+     "married": 20000000
+    }
    }
   },
   "MI": {
@@ -1787,6 +1899,12 @@
    "personalExemption": {
     "single": 590000,
     "married": 1180000
+   },
+   "education529": {
+    "cap": {
+     "single": 500000,
+     "married": 1000000
+    }
    }
   },
   "MN": {
@@ -1831,6 +1949,12 @@
    "standardDeduction": {
     "single": 1530000,
     "married": 3060000
+   },
+   "education529": {
+    "cap": {
+     "single": 150000,
+     "married": 300000
+    }
    }
   },
   "MO": {
@@ -1871,6 +1995,12 @@
    "standardDeduction": {
     "single": 1610000,
     "married": 3220000
+   },
+   "education529": {
+    "cap": {
+     "single": 800000,
+     "married": 1600000
+    }
    }
   },
   "MS": {
@@ -1891,6 +2021,12 @@
    "personalExemption": {
     "single": 600000,
     "married": 1200000
+   },
+   "education529": {
+    "cap": {
+     "single": 1000000,
+     "married": 2000000
+    }
    }
   },
   "MT": {
@@ -1919,6 +2055,12 @@
    "standardDeduction": {
     "single": 1610000,
     "married": 3220000
+   },
+   "education529": {
+    "cap": {
+     "single": 300000,
+     "married": 600000
+    }
    }
   },
   "NC": {
@@ -1962,6 +2104,12 @@
    "standardDeduction": {
     "single": 1610000,
     "married": 3220000
+   },
+   "education529": {
+    "cap": {
+     "single": 500000,
+     "married": 1000000
+    }
    }
   },
   "NE": {
@@ -2002,6 +2150,9 @@
    "personalCredit": {
     "single": 17600,
     "married": 35200
+   },
+   "education529": {
+    "cap": 1000000
    }
   },
   "NH": {
@@ -2077,6 +2228,10 @@
    "personalExemption": {
     "single": 100000,
     "married": 200000
+   },
+   "education529": {
+    "cap": 1000000,
+    "incomeLimit": 20000000
    }
   },
   "NM": {
@@ -2137,7 +2292,8 @@
    "standardDeduction": {
     "single": 1610000,
     "married": 3220000
-   }
+   },
+   "education529": {}
   },
   "NV": {
    "brackets": []
@@ -2224,6 +2380,12 @@
    "standardDeduction": {
     "single": 800000,
     "married": 1605000
+   },
+   "education529": {
+    "cap": {
+     "single": 500000,
+     "married": 1000000
+    }
    }
   },
   "OH": {
@@ -2240,6 +2402,10 @@
    "personalExemption": {
     "single": 240000,
     "married": 480000
+   },
+   "education529": {
+    "cap": 400000,
+    "perBeneficiary": true
    }
   },
   "OK": {
@@ -2288,6 +2454,12 @@
    "personalExemption": {
     "single": 100000,
     "married": 200000
+   },
+   "education529": {
+    "cap": {
+     "single": 1000000,
+     "married": 2000000
+    }
    }
   },
   "OR": {
@@ -2336,11 +2508,25 @@
    "personalCredit": {
     "single": 25600,
     "married": 51200
+   },
+   "education529": {
+    "cap": {
+     "single": 76000,
+     "married": 152000
+    },
+    "creditRate": 0.25
    }
   },
   "PA": {
    "flatRate": 0.0307,
-   "conformsToPreTaxDeferrals": false
+   "conformsToPreTaxDeferrals": false,
+   "education529": {
+    "cap": {
+     "single": 1900000,
+     "married": 3800000
+    },
+    "perBeneficiary": true
+   }
   },
   "RI": {
    "brackets": [
@@ -2364,6 +2550,12 @@
    "personalExemption": {
     "single": 525000,
     "married": 1050000
+   },
+   "education529": {
+    "cap": {
+     "single": 50000,
+     "married": 100000
+    }
    }
   },
   "SC": {
@@ -2384,7 +2576,8 @@
    "standardDeduction": {
     "single": 835000,
     "married": 1670000
-   }
+   },
+   "education529": {}
   },
   "SD": {
    "brackets": []
@@ -2396,7 +2589,15 @@
    "brackets": []
   },
   "UT": {
-   "flatRate": 0.045
+   "flatRate": 0.045,
+   "education529": {
+    "cap": {
+     "single": 256000,
+     "married": 512000
+    },
+    "perBeneficiary": true,
+    "creditRate": 0.0445
+   }
   },
   "VA": {
    "brackets": [
@@ -2424,6 +2625,10 @@
    "personalExemption": {
     "single": 93000,
     "married": 186000
+   },
+   "education529": {
+    "cap": 400000,
+    "perBeneficiary": true
    }
   },
   "VT": {
@@ -2472,6 +2677,14 @@
    "personalExemption": {
     "single": 530000,
     "married": 1060000
+   },
+   "education529": {
+    "cap": {
+     "single": 250000,
+     "married": 500000
+    },
+    "perBeneficiary": true,
+    "creditRate": 0.1
    }
   },
   "WA": {
@@ -2523,6 +2736,10 @@
    "personalExemption": {
     "single": 70000,
     "married": 140000
+   },
+   "education529": {
+    "cap": 528000,
+    "perBeneficiary": true
    }
   },
   "WV": {
@@ -2551,7 +2768,8 @@
    "personalExemption": {
     "single": 200000,
     "married": 400000
-   }
+   },
+   "education529": {}
   },
   "WY": {
    "brackets": []

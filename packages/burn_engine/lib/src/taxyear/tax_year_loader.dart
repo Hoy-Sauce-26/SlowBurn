@@ -238,6 +238,19 @@ Map<String, JurisdictionRules> _jurisdictions(dynamic v) =>
             retirementIncomeExclusion:
                 _jurisdictionByStatus<Money>(
                     r['retirementIncomeExclusion'], _money),
+            education529: r['education529'] == null
+                ? null
+                : Education529Benefit(
+                    cap: _jurisdictionByStatus<Money>(
+                        r['education529']['cap'], _money),
+                    perBeneficiary:
+                        r['education529']['perBeneficiary'] as bool? ?? false,
+                    creditRate: r['education529']['creditRate'] == null
+                        ? null
+                        : _rate(r['education529']['creditRate']),
+                    incomeLimit: _jurisdictionByStatus<Money>(
+                        r['education529']['incomeLimit'], _money),
+                  ),
           ),
         ));
 

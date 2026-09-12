@@ -45,6 +45,11 @@ class YearInputs {
   /// waterfall settled (§4.4). Absent means the committed amount stands.
   final Map<Id, Money> resolvedContributions;
 
+  /// What the household's 529s hold this year (§4.4). Absent means the
+  /// entered balances, which is right for a single year and wrong for any
+  /// later one, so the projection always passes it.
+  final Money? restrictedBalance;
+
   const YearInputs({
     this.rmdIncome = Money.zero,
     this.realizedGainsOnDraws = Money.zero,
@@ -53,6 +58,7 @@ class YearInputs {
     this.annualDepreciation = Money.zero,
     this.studentLoanInterestPaid = Money.zero,
     this.resolvedContributions = const {},
+    this.restrictedBalance,
   });
 }
 
@@ -139,7 +145,6 @@ TaxableIncome computeTaxableIncome(
   int? retirementYear,
   YearInputs inputs = const YearInputs(),
 }) {
-  final retired = retirementYear != null && year >= retirementYear;
   final people = household.peopleIn(unit).toList();
   final personIds = {for (final p in people) p.id};
   final unitWages =
@@ -178,12 +183,15 @@ TaxableIncome computeTaxableIncome(
           personIds.contains(a.personId) &&
           a.taxTreatment == TaxTreatment.taxable)
       .toList();
-  final inAccountInvestmentIncome = sumMoney(taxableAccounts.map(
-      (a) => a.balance * blendedIncomeYield(a, assetClasses, retired: retired)));
+  bool moved(Account a) =>
+      household.movedIn(a, year, retirementYear: retirementYear);
+  final inAccountInvestmentIncome = sumMoney(taxableAccounts.map((a) =>
+      a.balance * blendedIncomeYield(a, assetClasses, retired: moved(a))));
   final qualifiedDividends = sumMoney(taxableAccounts.map((a) =>
       a.balance *
-      (blendedIncomeYield(a, assetClasses, retired: retired) *
-          blendedQualifiedIncomeFraction(a, assetClasses, retired: retired))));
+      (blendedIncomeYield(a, assetClasses, retired: moved(a)) *
+          blendedQualifiedIncomeFraction(a, assetClasses,
+              retired: moved(a)))));
   final ordinaryInAccountIncome =
       inAccountInvestmentIncome - qualifiedDividends;
 

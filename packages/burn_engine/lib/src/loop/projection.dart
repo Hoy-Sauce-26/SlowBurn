@@ -108,6 +108,24 @@ Projection project(
 
   final years = <ProjectedYear>[];
 
+  Money restrictedBalance() => sumMoney(accounts.values
+      .where((a) => a.account.isRestrictedPurpose)
+      .map((a) => a.balance));
+
+  // The last year anything is spent on education, after which a 529 has
+  // nothing to pay for. Null while some of it runs on with no end.
+  final meta = {
+    for (final c in household.expenseCategories) c.id: c.metaCategory
+  };
+  final education = household.expenseItems
+      .where((i) => meta[i.categoryId] == MetaCategory.education)
+      .toList();
+  final lastTuition = education.isEmpty
+      ? currentYear - 1
+      : education.any((i) => i.endYear == null)
+          ? null
+          : education.map((i) => i.endYear!).reduce(math.max);
+
   for (var year = currentYear; year <= horizon; year++) {
     final frac = year == currentYear ? _yearFraction(asOfDate) : 1.0;
     final flags = <String>{};
@@ -273,6 +291,7 @@ Projection project(
         studentLoanInterestPaid: sumMoney(liabilities.values
             .where((l) => l.liability.isTaxDeductibleInterest)
             .map((l) => l.interestPaidThisYear)),
+        restrictedBalance: restrictedBalance(),
       ),
     );
     if (solved.waterfallNotConverged) flags.add('waterfallNotConverged');
@@ -293,16 +312,19 @@ Projection project(
     }
 
     // From the retirement year on, an account holds whatever it was going to
-    // be moved into. A portfolio that carries somebody to retirement is rarely
-    // the one they live off afterwards (§3.9).
-    final retired = retirementYear != null && year >= retirementYear;
+    // be moved into, and a 529 from the year its tuition starts. A portfolio
+    // that carries somebody to retirement is rarely the one they live off
+    // afterwards (§3.9).
+    bool moved(AccountState s) =>
+        household.movedIn(s.account, year, retirementYear: retirementYear);
 
     // Distributions are taxed this year and stay in the account, so they raise
     // basis without moving the balance (§4.3.1, §6.3). Without this the same
     // dollars would be taxed again as gains on the way out.
     for (final state in accounts.values.where((a) => a.isTaxable)) {
       state.creditInvestmentIncome(state.balance *
-          blendedIncomeYield(state.account, assetClasses, retired: retired));
+          blendedIncomeYield(state.account, assetClasses,
+              retired: moved(state)));
     }
 
     final earnedIncome = {
@@ -372,6 +394,7 @@ Projection project(
             realizedGainsOnDraws: draw.realizedGains,
             assetSaleTaxableGain: assetSaleGain,
             assetSaleRecapture: assetSaleRecapture,
+            restrictedBalance: restrictedBalance(),
           ),
           penalties: draw.penalties,
         );
@@ -411,13 +434,31 @@ Projection project(
       }
     }
 
+    // The tuition the 529s paid comes out of them, in proportion to what each
+    // holds. Left in, the same balance would pay every year's tuition (§4.4).
+    final paid = solved.cashFlow.education529Draw * frac;
+    final held = restrictedBalance();
+    if (paid.isPositive && held.isPositive) {
+      for (final state
+          in accounts.values.where((a) => a.account.isRestrictedPurpose)) {
+        state.withdraw(paid * state.balance.ratioTo(held));
+      }
+    }
+    // Said once, the first year there is nothing left for it to pay. Taken out
+    // for anything else, its growth is taxed and penalised.
+    if (lastTuition != null &&
+        year == math.max(lastTuition + 1, currentYear) &&
+        restrictedBalance() > Money.dollars(1000)) {
+      flags.add('education529LeftOver');
+    }
+
     // Growth, then amortisation, then the measures.
     for (final state in accounts.values) {
       state.grow(
           assetClasses: assetClasses,
           band: band,
           frac: frac,
-          retired: retired);
+          retired: moved(state));
     }
     for (final debt in liabilities.values) {
       debt.advanceYear(
@@ -441,7 +482,7 @@ Projection project(
       assumptions: assumptions,
       taxYear: taxYear,
       assetClasses: assetClasses,
-      retirementAnnualExpenses: annualExpenses,
+      retirementAnnualExpenses: solved.cashFlow.expensesFromLiquid,
       year: year,
       currentYear: currentYear,
     );

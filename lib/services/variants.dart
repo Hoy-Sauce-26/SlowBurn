@@ -281,6 +281,7 @@ Account _withContributionEnd(Account a, int endYear) => Account(
       allocationWeights: a.allocationWeights,
       isRestrictedPurpose: a.isRestrictedPurpose,
       targetBalanceMonths: a.targetBalanceMonths,
+      beneficiaryId: a.beneficiaryId,
       contribution: Contribution(
         mode: a.contribution.mode,
         value: a.contribution.value,

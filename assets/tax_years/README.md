@@ -61,6 +61,20 @@ schedule.
 Connecticut's joint schedule was reconstructed by doubling its single
 brackets, because the source table skipped a rate.
 
+`education529` is what each state gives back for 529 contributions, taken
+from each plan's or revenue department's own 2026 figures and checked
+against savingforcollege.com. `cap` is the most contribution that counts,
+`perBeneficiary` applies it to each child separately, `creditRate` marks a
+credit rather than a deduction, and `incomeLimit` is the federal AGI above
+which nothing is given. Thirteen states give nothing. The engine assumes the
+household uses its own state's plan, and ignores the carry-forward that
+Virginia, Ohio and Maryland allow above the cap. Where a cap is per
+taxpayer, the married figure assumes both spouses contribute. Oregon's
+credit depends on income and is stored at the rate for $70,000 to $100,000
+of AGI, which reaches the same $190 or $380 cap as the other tiers at the
+amounts a college plan puts in. Minnesota is stored as its subtraction,
+since its credit phases out well below most savers' incomes.
+
 `retirementIncomeExclusion` is zero for every state, which understates what
 retirees in about thirty of them keep. Tracked in
 [backlog.md](../../docs/backlog.md).

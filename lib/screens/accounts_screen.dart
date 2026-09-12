@@ -2,6 +2,7 @@ import 'package:burn_engine/burn_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/college.dart';
 import '../services/providers.dart';
 import '../services/flag_placement.dart';
 import '../widgets/entity_list.dart';
@@ -163,38 +164,115 @@ class AccountsScreen extends ConsumerWidget {
         '${formatMoney(Money(c.value.round()))} a year',
       _ => 'no contribution',
     };
-    return '$owner · ${humanise(a.kind.wireName)} · $contributing';
+    final child =
+        h.dependents.where((d) => d.id == a.beneficiaryId).firstOrNull;
+    return '$owner · ${humanise(a.kind.wireName)}'
+        '${child == null ? '' : ' · for ${childName(child)}'} · $contributing';
   }
 
+  /// [draft] opens the editor on an account that does not exist yet, already
+  /// filled in, as the spending screen does when it offers a 529.
   Future<void> editAccount(
-      BuildContext context, WidgetRef ref, Account? existing) async {
+      BuildContext context, WidgetRef ref, Account? existing,
+      {Account? draft}) async {
     final household = ref.read(householdProvider);
     final notifier = ref.read(householdProvider.notifier);
     final classes = ref.read(assetClassesProvider);
+    final seed = existing ?? draft;
+    final thisYear = DateTime.now().year;
 
+    final id = existing?.id ?? draft?.id ?? newId('acct');
     var label = existing?.label ?? '';
-    var personId = existing?.personId ?? household.people.first.id;
-    var kind = existing?.kind ?? AccountKind.traditional401k;
-    var balance = existing?.balance ?? Money.zero;
-    var basis = existing?.costBasis ?? Money.zero;
-    var rothBasis = existing?.rothContributionBasis ?? Money.zero;
+    var personId = seed?.personId ?? household.people.first.id;
+    var kind = seed?.kind ?? AccountKind.traditional401k;
+    var balance = seed?.balance ?? Money.zero;
+    var basis = seed?.costBasis ?? Money.zero;
+    var rothBasis = seed?.rothContributionBasis ?? Money.zero;
     var allocationId =
-        existing?.assetAllocationId ?? defaultClassFor(kind, classes);
+        seed?.assetAllocationId ?? defaultClassFor(kind, classes);
     // Suggested rather than left empty, because the plan that assumes you stay
     // in shares through a forty-year retirement is the optimistic one and
     // nobody notices it is being made.
-    var retirementAllocationId = existing == null
+    var retirementAllocationId = seed == null
         ? conservativeClassFor(kind, classes)
-        : existing.retirementAllocationId;
-    var buffer = existing?.targetBalanceMonths;
-    var mode = existing?.contribution.mode ?? ContributionMode.percentOfGross;
-    var contribution = existing?.contribution.value ?? 0.0;
-    var employerId = existing?.employerId;
-    var match = existing?.contribution.employerMatch;
-    var contributionEnd = existing?.contribution.endYear;
+        : seed.retirementAllocationId;
+    var buffer = seed?.targetBalanceMonths;
+    var mode = seed?.contribution.mode ?? ContributionMode.percentOfGross;
+    var contribution = seed?.contribution.value ?? 0.0;
+    var employerId = seed?.employerId;
+    var match = seed?.contribution.employerMatch;
+    var contributionStart = seed?.contribution.startYear;
+    var contributionEnd = seed?.contribution.endYear;
+    var beneficiaryId = seed?.beneficiaryId;
     // A new account starts dormant, because the ones people forget are the old
     // plans from old jobs. Naming a current employer is what says otherwise.
-    var paying = existing != null && existing.contribution.value > 0;
+    var paying = seed != null && seed.contribution.value > 0;
+    // Bumped when a suggestion fills the amount in, so the field shows it.
+    var filled = 0;
+
+    Rate returnOf(Id? classId) =>
+        classes.where((c) => c.id == classId).firstOrNull?.expectedRealReturn ??
+        0;
+
+    // What the form says right now: what Save writes, and what the
+    // comparison runs.
+    Account current() {
+      final treatment = defaultTaxTreatment(kind);
+      final flags = defaultReducesFlags(kind);
+      return Account(
+        id: id,
+        personId: personId,
+        label: label.trim().isEmpty
+            ? defaultAccountLabel(household,
+                personId: personId,
+                employerId: employerId,
+                kind: kind,
+                beneficiaryId: beneficiaryId,
+                excluding: existing?.id)
+            : label.trim(),
+        kind: kind,
+        taxTreatment: treatment,
+        limitFamily: defaultLimitFamily(kind),
+        balance: balance,
+        // Cash is money that has already been taxed, so it opens at full
+        // basis rather than at a zero nobody entered.
+        costBasis: switch (treatment) {
+          TaxTreatment.taxable when kind.isCash => balance,
+          TaxTreatment.taxable => basis,
+          _ => Money.zero,
+        },
+        rothContributionBasis:
+            treatment == TaxTreatment.roth ? rothBasis : Money.zero,
+        rothFirstContributionYear: existing?.rothFirstContributionYear,
+        isRestrictedPurpose: isRestrictedPurpose(treatment),
+        assetAllocationId: allocationId,
+        retirementAllocationId: retirementAllocationId,
+        targetBalanceMonths: buffer,
+        employerId: employerId,
+        beneficiaryId:
+            kind == AccountKind.education529 ? beneficiaryId : null,
+        contribution: Contribution(
+          // Nothing going in is a fixed nothing, never a share of a salary
+          // that may not exist.
+          mode: paying ? mode : ContributionMode.fixedAmount,
+          value: paying ? contribution : 0,
+          contributionBaseStreamIds:
+              paying && mode == ContributionMode.percentOfGross
+                  ? household
+                      .streamsFor(personId)
+                      .where((s) => s.kind.isEarned)
+                      .map((s) => s.id)
+                      .toList()
+                  : const [],
+          employerMatch: !paying || employerId == null ? null : match,
+          startYear: paying ? contributionStart : null,
+          endYear: paying ? contributionEnd : null,
+          reducesFederalTaxableIncome: flags.federal,
+          reducesStateTaxableIncome: flags.state,
+          reducesFicaWages: flags.fica,
+        ),
+      );
+    }
 
     await showEditor<void>(
       context,
@@ -202,6 +280,20 @@ class AccountsScreen extends ConsumerWidget {
       build: (context) => StatefulBuilder(
         builder: (context, setState) {
           final treatment = defaultTaxTreatment(kind);
+          final isCollege = kind == AccountKind.education529;
+          final children = household.dependents.toList();
+          final education = isCollege
+              ? educationByChild(household)
+                  .where((p) => p.child?.id == beneficiaryId)
+                  .firstOrNull
+              : null;
+          final suggested = education == null
+              ? null
+              : fullFundingDeposit(household, education,
+                  balance: balance,
+                  growth: returnOf(allocationId),
+                  drawdown: returnOf(retirementAllocationId ?? allocationId),
+                  thisYear: thisYear);
           return Column(
             children: [
               FieldRow([
@@ -231,11 +323,26 @@ class AccountsScreen extends ConsumerWidget {
                     onChanged: (p) => setState(() => personId = p.id),
                   ),
               ]),
+              if (isCollege && children.isNotEmpty) ...[
+                SearchableField<Dependent>(
+                  label: 'Saving for',
+                  helper: 'It moves somewhere safer the year their education '
+                      'starts.',
+                  values: children,
+                  value: children
+                      .where((d) => d.id == beneficiaryId)
+                      .firstOrNull,
+                  noneLabel: 'Any education in the plan',
+                  describe: (d) => childName(d),
+                  onChanged: (d) => setState(() => beneficiaryId = d?.id),
+                ),
+                const SizedBox(height: 12),
+              ],
               FieldRow([
                 MoneyField(
                   label: 'Balance',
                   initial: balance,
-                  onChanged: (v) => balance = v,
+                  onChanged: (v) => setState(() => balance = v),
                 ),
                 if (treatment == TaxTreatment.taxable && !kind.isCash)
                   MoneyField(
@@ -320,24 +427,55 @@ class AccountsScreen extends ConsumerWidget {
                     )
                   else
                     MoneyField(
+                      key: ValueKey('each-year-$filled'),
                       label: 'Each year',
                       initial: Money(contribution.round()),
                       onChanged: (v) => contribution = v.cents.toDouble(),
                     ),
                 ]),
+                if (education != null)
+                  _FullFunding(
+                    plan: education,
+                    deposit: suggested,
+                    thisYear: thisYear,
+                    onUse: (deposit) => setState(() {
+                      final start = education.savingFrom(thisYear);
+                      mode = ContributionMode.fixedAmount;
+                      contribution = deposit.cents.toDouble();
+                      contributionStart = start > thisYear ? start : null;
+                      contributionEnd = education.firstYear(thisYear) - 1;
+                      filled++;
+                    }),
+                  ),
                 if (employerId != null &&
                     defaultLimitFamily(kind) == LimitFamily.electiveDeferral)
                   _MatchEditor(match: match, onChanged: (m) => match = m),
-                NumberChoiceField(
-                  label: 'Last year you pay in',
-                  helper: 'Leave this until you retire unless you mean to stop '
-                      'early and let it grow on its own.',
-                  first: DateTime.now().year,
-                  last: DateTime.now().year + 60,
-                  value: contributionEnd,
-                  noneLabel: 'Until I retire',
-                  onChanged: (v) => contributionEnd = v,
-                ),
+                FieldRow([
+                  // A 529 for a child not born yet starts when they are.
+                  if (isCollege)
+                    NumberChoiceField(
+                      label: 'First year you pay in',
+                      helper: 'A 529 is opened in the child\'s name, so for '
+                          'one not born yet this is the year they arrive.',
+                      first: thisYear + 1,
+                      last: thisYear + 40,
+                      value: contributionStart,
+                      noneLabel: 'This year',
+                      onChanged: (v) => setState(() => contributionStart = v),
+                    ),
+                  NumberChoiceField(
+                    label: 'Last year you pay in',
+                    helper: isCollege
+                        ? 'Usually the year before the first bill.'
+                        : 'Leave this until you retire unless you mean to '
+                            'stop early and let it grow on its own.',
+                    first: thisYear,
+                    last: thisYear + 60,
+                    value: contributionEnd,
+                    noneLabel: 'Until I retire',
+                    onChanged: (v) => setState(() => contributionEnd = v),
+                  ),
+                ]),
               ],
               const SizedBox(height: 12),
               FieldRow([
@@ -353,15 +491,21 @@ class AccountsScreen extends ConsumerWidget {
                 if (!kind.isCash)
                   SearchableField<AssetClass>(
                     key: ValueKey(retirementAllocationId),
-                    label: 'And once retired',
-                    helper: kind.reachableBeforeFiftyNineHalf
-                        ? 'This is money you can spend before 59½, so it is '
-                            'what an early retirement lives on and what a bad '
-                            'first decade would hurt. Most plans hold less in '
-                            'shares here by then.'
-                        : 'Locked until 59½, so an early retirement never '
-                            'touches it and it has years to ride out a bad '
-                            'decade. Usually left where it is.',
+                    label: isCollege
+                        ? 'Once their education starts'
+                        : 'And once retired',
+                    helper: isCollege
+                        ? 'Most 529 plans move out of shares as the bills '
+                            'get close, so a bad year just before college '
+                            'costs less.'
+                        : kind.reachableBeforeFiftyNineHalf
+                            ? 'This is money you can spend before 59½, so it '
+                                'is what an early retirement lives on and what '
+                                'a bad first decade would hurt. Most plans hold '
+                                'less in shares here by then.'
+                            : 'Locked until 59½, so an early retirement never '
+                                'touches it and it has years to ride out a bad '
+                                'decade. Usually left where it is.',
                     values: classes,
                     value: classes
                         .where((c) => c.id == retirementAllocationId)
@@ -395,6 +539,10 @@ class AccountsScreen extends ConsumerWidget {
                   child: Note('Another account is already holding an emergency '
                       'fund. Both will be filled to their own target.'),
                 ),
+              if (isCollege) ...[
+                const SizedBox(height: 12),
+                _WorthIt(account: current),
+              ],
               const SizedBox(height: 12),
               LabelledTextField(
                 label: 'Name it (optional)',
@@ -403,64 +551,13 @@ class AccountsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Note('Left blank, this will be called '
-                  '"${defaultAccountLabel(household, personId: personId, employerId: employerId, kind: kind, excluding: existing?.id)}".'),
+                  '"${defaultAccountLabel(household, personId: personId, employerId: employerId, kind: kind, beneficiaryId: beneficiaryId, excluding: existing?.id)}".'),
               const SizedBox(height: 16),
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton(
                   onPressed: () {
-                    final flags = defaultReducesFlags(kind);
-                    notifier.saveAccount(Account(
-                      id: existing?.id ?? newId('acct'),
-                      personId: personId,
-                      label: label.trim().isEmpty
-                          ? defaultAccountLabel(household,
-                              personId: personId,
-                              employerId: employerId,
-                              kind: kind,
-                              excluding: existing?.id)
-                          : label.trim(),
-                      kind: kind,
-                      taxTreatment: treatment,
-                      limitFamily: defaultLimitFamily(kind),
-                      balance: balance,
-                      // Cash is money that has already been taxed, so it opens
-                      // at full basis rather than at a zero nobody entered.
-                      costBasis: switch (treatment) {
-                        TaxTreatment.taxable when kind.isCash => balance,
-                        TaxTreatment.taxable => basis,
-                        _ => Money.zero,
-                      },
-                      rothContributionBasis:
-                          treatment == TaxTreatment.roth ? rothBasis : Money.zero,
-                      rothFirstContributionYear:
-                          existing?.rothFirstContributionYear,
-                      isRestrictedPurpose: isRestrictedPurpose(treatment),
-                      assetAllocationId: allocationId,
-                      retirementAllocationId: retirementAllocationId,
-                      targetBalanceMonths: buffer,
-                      employerId: employerId,
-                      contribution: Contribution(
-                        // Nothing going in is a fixed nothing, never a share
-                        // of a salary that may not exist.
-                        mode: paying ? mode : ContributionMode.fixedAmount,
-                        value: paying ? contribution : 0,
-                        contributionBaseStreamIds:
-                            paying && mode == ContributionMode.percentOfGross
-                                ? household
-                                    .streamsFor(personId)
-                                    .where((s) => s.kind.isEarned)
-                                    .map((s) => s.id)
-                                    .toList()
-                                : const [],
-                        employerMatch:
-                            !paying || employerId == null ? null : match,
-                        endYear: paying ? contributionEnd : null,
-                        reducesFederalTaxableIncome: flags.federal,
-                        reducesStateTaxableIncome: flags.state,
-                        reducesFicaWages: flags.fica,
-                      ),
-                    ));
+                    notifier.saveAccount(current());
                     Navigator.of(context).pop();
                   },
                   child: const Text('Save'),
@@ -482,24 +579,32 @@ bool canBeSponsored(AccountKind kind) =>
     kind == AccountKind.simpleIra ||
     kind == AccountKind.sepIra;
 
-/// "Acme 401(k)", or "Alex's Roth IRA" where no job is behind it.
+/// "Acme 401(k)", or "Alex's Roth IRA" where no job is behind it, or "Maya's
+/// 529" where it is saving for somebody.
 String defaultAccountLabel(
   Household household, {
   required Id personId,
   required Id? employerId,
   required AccountKind kind,
+  Id? beneficiaryId,
   Id? excluding,
 }) {
   final employer =
       household.employers.where((e) => e.id == employerId).firstOrNull?.label;
   final person = household.personById(personId)?.displayName;
+  final child =
+      household.dependents.where((d) => d.id == beneficiaryId).firstOrNull;
   final what = accountKindName(kind);
 
-  final base = employer != null
-      ? '$employer $what'
-      : person == null
-          ? what
-          : "$person's $what";
+  final base = child != null
+      ? (child.name?.trim().isNotEmpty ?? false)
+          ? "${child.name!.trim()}'s $what"
+          : '$what, ${childName(child).toLowerCase()}'
+      : employer != null
+          ? '$employer $what'
+          : person == null
+              ? what
+              : "$person's $what";
 
   return uniqueLabel(
       base,
@@ -529,9 +634,274 @@ Id defaultClassFor(AccountKind kind, List<AssetClass> classes) {
 /// A suggestion rather than a rule. Somebody who means to stay in shares can
 /// say so, and will then be reading a number that knows they did.
 Id? conservativeClassFor(AccountKind kind, List<AssetClass> classes) {
-  // Only the money the first fifteen years are spent from. A 401(k) nobody
-  // can touch until 59½ has fifteen more years to ride out a bad decade, and
-  // derisking it at 45 costs real growth for no protection.
-  if (kind.isCash || !kind.reachableBeforeFiftyNineHalf) return null;
+  // Only the money the first fifteen years are spent from, and a 529, which
+  // is spent over four. A 401(k) nobody can touch until 59½ has fifteen more
+  // years to ride out a bad decade, and derisking it at 45 costs real growth
+  // for no protection.
+  if (kind.isCash) return null;
+  if (kind != AccountKind.education529 && !kind.reachableBeforeFiftyNineHalf) {
+    return null;
+  }
   return classes.where((c) => c.label == AssetClassLabel.bonds).firstOrNull?.id;
+}
+
+/// A 529 set up to pay for all of [plan]: paid into from now, or from the
+/// year a child not yet born arrives, until the year before the first bill,
+/// and moved into bonds when the bills start.
+///
+/// The whole cost by default. Somebody paying for half of college lowers the
+/// amount, which is easier than working out what "all of it" would have been.
+Account collegeDraft(
+  Household household,
+  EducationPlan plan,
+  List<AssetClass> classes, {
+  required int thisYear,
+}) {
+  const kind = AccountKind.education529;
+  final growthId = defaultClassFor(kind, classes);
+  final safeId = conservativeClassFor(kind, classes);
+  Rate returnOf(Id? classId) =>
+      classes.where((c) => c.id == classId).firstOrNull?.expectedRealReturn ??
+      0;
+  final deposit = fullFundingDeposit(household, plan,
+      balance: Money.zero,
+      growth: returnOf(growthId),
+      drawdown: returnOf(safeId ?? growthId),
+      thisYear: thisYear);
+  final personId = household.people.first.id;
+  final flags = defaultReducesFlags(kind);
+  final start = plan.savingFrom(thisYear);
+  return Account(
+    id: newId('acct'),
+    personId: personId,
+    label: defaultAccountLabel(household,
+        personId: personId,
+        employerId: null,
+        kind: kind,
+        beneficiaryId: plan.child?.id),
+    kind: kind,
+    taxTreatment: defaultTaxTreatment(kind),
+    limitFamily: defaultLimitFamily(kind),
+    balance: Money.zero,
+    isRestrictedPurpose: true,
+    assetAllocationId: growthId,
+    retirementAllocationId: safeId,
+    beneficiaryId: plan.child?.id,
+    contribution: Contribution(
+      mode: ContributionMode.fixedAmount,
+      value: (deposit ?? Money.zero).cents.toDouble(),
+      startYear: deposit == null || start == thisYear ? null : start,
+      endYear: deposit == null ? null : plan.firstYear(thisYear) - 1,
+      reducesFederalTaxableIncome: flags.federal,
+      reducesStateTaxableIncome: flags.state,
+      reducesFicaWages: flags.fica,
+    ),
+  );
+}
+
+/// What paying for all of a child's education would take, offered rather
+/// than imposed.
+class _FullFunding extends StatelessWidget {
+  final EducationPlan plan;
+  final Money? deposit;
+  final int thisYear;
+  final ValueChanged<Money> onUse;
+
+  const _FullFunding({
+    required this.plan,
+    required this.deposit,
+    required this.thisYear,
+    required this.onUse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final whose = plan.child == null
+        ? 'the education in this plan'
+        : "${childName(plan.child!)}'s education";
+    final first = plan.firstYear(thisYear);
+    final last = plan.lastYear;
+    final span = last == null || last == first ? '$first' : '$first to $last';
+    final start = plan.savingFrom(thisYear);
+    final from = start > thisYear ? 'from $start' : 'from now';
+    // Room below as well as above: the next field's label floats above its
+    // border, and a two-line note runs straight into it otherwise.
+    const room = EdgeInsets.only(top: 8, bottom: 20);
+    if (deposit == null) {
+      return Padding(
+        padding: room,
+        child: Note('The bills for $whose start before there is a year to '
+            'save ahead of them. What is here pays them as they come.'),
+      );
+    }
+    return Padding(
+      padding: room,
+      child: Row(
+        children: [
+          Expanded(
+            child: Note('Paying for all of $whose, $span, takes about '
+                '${formatMoneyWhole(deposit!)} a year $from until '
+                '${first - 1}.'),
+          ),
+          TextButton(
+            onPressed: () => onUse(deposit!),
+            child: const Text('Use this'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The plan with this 529 paid into, beside the same plan without it.
+///
+/// Worked out on request rather than on every keystroke, since it is two
+/// whole solves and the answer only means something once the amount is set.
+class _WorthIt extends ConsumerStatefulWidget {
+  final Account Function() account;
+
+  const _WorthIt({required this.account});
+
+  @override
+  ConsumerState<_WorthIt> createState() => _WorthItState();
+}
+
+class _WorthItState extends ConsumerState<_WorthIt> {
+  ({Band<BandResult> saving, Band<BandResult> notSaving})? _result;
+
+  void _compare() {
+    final taxYear = ref.read(taxYearProvider).value;
+    if (taxYear == null) return;
+    setState(() => _result = compareSaving(
+          ref.read(householdProvider),
+          widget.account(),
+          assumptions: ref.read(scenarioProvider).assumptions,
+          taxYear: taxYear,
+          assetClasses: {
+            for (final c in ref.read(assetClassesProvider)) c.id: c
+          },
+          asOfDate: DateTime.now(),
+        ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final household = ref.watch(householdProvider);
+    final ready = ref.watch(setupProgressProvider).showsProjection(household);
+    final result = _result;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Is it worth it?', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        if (!ready)
+          const Note('Once your plan is ready to read, this compares it with '
+              'and without this 529.')
+        else ...[
+          Note('Your plan with this 529, beside the same plan with that money '
+              'going wherever your other savings go. The difference is the '
+              'tax it saves, less what it costs to have the money set aside.'),
+          const SizedBox(height: 8),
+          if (result == null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                onPressed: _compare,
+                child: const Text('Compare'),
+              ),
+            )
+          else ...[
+            _ComparisonTable(saving: result.saving, notSaving: result.notSaving),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _compare,
+                child: const Text('Compare again'),
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _ComparisonTable extends StatelessWidget {
+  final Band<BandResult> saving;
+  final Band<BandResult> notSaving;
+
+  const _ComparisonTable({required this.saving, required this.notSaving});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    String year(BandResult r) => r.retirementYear?.toString() ?? 'Not reached';
+    Money worth(BandResult r) => r.finalPass.years.last.netWorth.netWorth;
+    String signed(Money m) => m.isNegative
+        ? '−${formatMoneyCompact(-m)}'
+        : '+${formatMoneyCompact(m)}';
+    String yearsApart(BandResult a, BandResult b) {
+      if (a.retirementYear == null || b.retirementYear == null) return '';
+      final d = b.retirementYear! - a.retirementYear!;
+      return d == 0
+          ? 'Same year'
+          : '${d.abs()} ${d.abs() == 1 ? 'year' : 'years'} '
+              '${d > 0 ? 'sooner' : 'later'}';
+    }
+
+    final end = saving.expected.finalPass.years.last.year;
+    final rows = <List<String>>[
+      ['', 'With it', 'Without', 'Difference'],
+      [
+        'You can retire',
+        year(saving.expected),
+        year(notSaving.expected),
+        yearsApart(saving.expected, notSaving.expected),
+      ],
+      [
+        'In a poor market',
+        year(saving.pessimistic),
+        year(notSaving.pessimistic),
+        yearsApart(saving.pessimistic, notSaving.pessimistic),
+      ],
+      [
+        'Worth in $end',
+        formatMoneyCompact(worth(saving.expected)),
+        formatMoneyCompact(worth(notSaving.expected)),
+        signed(worth(saving.expected) - worth(notSaving.expected)),
+      ],
+      [
+        'Tax over the plan',
+        formatMoneyCompact(taxOver(saving.expected.finalPass)),
+        formatMoneyCompact(taxOver(notSaving.expected.finalPass)),
+        signed(taxOver(saving.expected.finalPass) -
+            taxOver(notSaving.expected.finalPass)),
+      ],
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Table(
+        defaultColumnWidth: const IntrinsicColumnWidth(),
+        children: [
+          for (final (i, row) in rows.indexed)
+            TableRow(children: [
+              for (final (j, cell) in row.indexed)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 4, 16, 4),
+                  child: Text(
+                    cell,
+                    textAlign: j == 0 ? TextAlign.start : TextAlign.end,
+                    style: i == 0
+                        ? theme.textTheme.labelMedium
+                        : theme.textTheme.bodyMedium,
+                  ),
+                ),
+            ]),
+        ],
+      ),
+    );
+  }
 }

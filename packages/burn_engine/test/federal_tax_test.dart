@@ -56,9 +56,80 @@ TaxYear taxYearWithState(String code, Map<String, dynamic> rules) {
 }
 
 Dependent child({int birthYear = 2018}) =>
-    Dependent(birthDate: DateTime(birthYear, 4, 1));
+    Dependent(id: 'd$birthYear', birthDate: DateTime(birthYear, 4, 1));
 
 void main() {
+  group('§4.3.6 what a state gives back for a 529', () {
+    Account college(String id, {String? child}) => Account(
+          id: id,
+          personId: 'p1',
+          label: 'College',
+          kind: AccountKind.education529,
+          taxTreatment: TaxTreatment.educationTaxFree,
+          limitFamily: LimitFamily.education,
+          balance: Money.zero,
+          isRestrictedPurpose: true,
+          beneficiaryId: child,
+          contribution: const Contribution(
+              mode: ContributionMode.fixedAmount, value: 0),
+        );
+
+    Money stateTax(String state, List<Account> accounts,
+            Map<Id, Money> put, {num pay = 120000}) =>
+        run(
+          Household(
+            id: 'h1',
+            taxUnits: [taxUnit(state: state)],
+            people: [person()],
+            incomeStreams: [salary(pay: pay)],
+            accounts: accounts,
+          ),
+          inputs: YearInputs(resolvedContributions: put),
+        ).owed.stateTax;
+
+    test('a deduction comes off income, up to the cap', () {
+      final none = stateTax('NY', [college('a')], {});
+      final five =
+          stateTax('NY', [college('a')], {'a': Money.dollars(5000)});
+      final eight =
+          stateTax('NY', [college('a')], {'a': Money.dollars(8000)});
+      expect(five < none, isTrue);
+      expect(eight, five,
+          reason: 'New York counts \$5,000 for a single filer');
+    });
+
+    test('where it is per beneficiary, each child has a cap of their own', () {
+      final put = {'a': Money.dollars(4000), 'b': Money.dollars(4000)};
+      final twoChildren = stateTax('GA',
+          [college('a', child: 'k1'), college('b', child: 'k2')], put);
+      final oneChild = stateTax('GA',
+          [college('a', child: 'k1'), college('b', child: 'k1')], put);
+      expect(twoChildren < oneChild, isTrue);
+    });
+
+    test('a credit comes off the tax itself', () {
+      final none = stateTax('IN', [college('a')], {});
+      final most =
+          stateTax('IN', [college('a')], {'a': Money.dollars(10000)});
+      expect(none - most, Money.dollars(1500),
+          reason: '20% of the first \$7,500');
+    });
+
+    test('nothing above the income limit', () {
+      final none = stateTax('NJ', [college('a')], {}, pay: 300000);
+      final put = stateTax(
+          'NJ', [college('a')], {'a': Money.dollars(10000)}, pay: 300000);
+      expect(put, none);
+    });
+
+    test('and nothing in a state that offers none', () {
+      final none = stateTax('CA', [college('a')], {});
+      final put =
+          stateTax('CA', [college('a')], {'a': Money.dollars(10000)});
+      expect(put, none);
+    });
+  });
+
   group('§4.3.3 the two schedules', () {
     test('the portions always sum to taxable income', () {
       final r = run(Household(

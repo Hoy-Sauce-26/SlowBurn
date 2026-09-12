@@ -126,6 +126,63 @@ void main() {
       expect(y.netWorth > y.liquidNetWorth, isTrue,
           reason: 'the 529 counts in net worth and not in liquid');
     });
+
+    test('tuition draws the 529 down, and it runs out', () {
+      // Once reported by nobody and wrong for every 529: the draw was sized
+      // off the entered balance each year and never taken out, so $80,000
+      // paid $30,000 a year indefinitely.
+      final h = Household(
+        id: 'h1',
+        taxUnits: [taxUnit()],
+        people: [person()],
+        incomeStreams: [salary(pay: 120000)],
+        accounts: [
+          brokerageIn(balance: 100000),
+          Account(
+            id: '529',
+            personId: 'p1',
+            label: 'College',
+            kind: AccountKind.education529,
+            taxTreatment: TaxTreatment.educationTaxFree,
+            limitFamily: LimitFamily.education,
+            balance: Money.dollars(80000),
+            isRestrictedPurpose: true,
+            assetAllocationId: 'stocks',
+            contribution: const Contribution(
+                mode: ContributionMode.fixedAmount, value: 0),
+          ),
+        ],
+        expenseCategories: const [
+          ExpenseCategory(
+            id: 'edu',
+            householdId: 'h1',
+            label: 'Education',
+            metaCategory: MetaCategory.education,
+          ),
+        ],
+        expenseItems: [
+          ExpenseItem(
+            id: 'college',
+            categoryId: 'edu',
+            label: 'College',
+            amount: Money.dollars(30000),
+            startYear: 2027,
+            endYear: 2030,
+          ),
+        ],
+      );
+      final p = run(h);
+      final paid = sumMoney(p.years
+          .where((y) => y.year >= 2027 && y.year <= 2030)
+          .map((y) => y.solved.cashFlow.education529Draw));
+      expect(paid > Money.dollars(80000), isTrue,
+          reason: 'it grows while it waits');
+      expect(paid < Money.dollars(120000), isTrue,
+          reason: 'four years at \$30,000 is more than it ever holds');
+      // Not quite zero: money taken out mid-year earns half a year first.
+      expect(p.yearOf(2030)!.accountBalances['529']! < Money.dollars(100),
+          isTrue);
+    });
   });
 
   group('§6 decumulation', () {

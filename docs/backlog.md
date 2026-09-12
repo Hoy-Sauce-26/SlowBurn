@@ -24,6 +24,13 @@ figures vary by rating area as much as by age, so the honest fix is either a
 rating-area table or a prompt that makes entering your own benchmark the
 expected path rather than an override.
 
+**The edges of the 529 model.** Money left after the last education bill is
+flagged, and its one way out is the penalty route: the rollover of up to
+$35,000 into the beneficiary's Roth IRA is not modelled. Contributions above a
+state's cap are not carried forward, which understates Virginia, Ohio and
+Maryland for anyone putting in more than the cap in one year. Oregon's credit
+is stored at a single income tier.
+
 ## Product
 
 **Coach marks over the screens.** The ordered setup path in

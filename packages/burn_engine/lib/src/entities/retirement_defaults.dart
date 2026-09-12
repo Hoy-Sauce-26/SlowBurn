@@ -113,4 +113,5 @@ Account _endContribution(Account a, int last) => Account(
       allocationWeights: a.allocationWeights,
       isRestrictedPurpose: a.isRestrictedPurpose,
       targetBalanceMonths: a.targetBalanceMonths,
+      beneficiaryId: a.beneficiaryId,
     );

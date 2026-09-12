@@ -2,6 +2,7 @@ import 'package:burn_engine/burn_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/college.dart';
 import '../services/flag_placement.dart';
 import '../services/providers.dart';
 import '../widgets/entity_list.dart';
@@ -369,15 +370,13 @@ class TaxUnitCard extends ConsumerWidget {
                 for (final (index, dependent) in unit.dependents.indexed)
                   EntityTile(
                     icon: Icons.child_care_outlined,
-                    title: dependent.birthDate.year > DateTime.now().year
-                        ? 'Planned for ${dependent.birthDate.year}'
-                        : 'Born ${dependent.birthDate.year}',
-                    subtitle: 'supported through '
+                    title: childName(dependent),
+                    subtitle: '${dependent.name == null ? '' : '${dependent.birthDate.year > DateTime.now().year ? 'planned for' : 'born'} ${dependent.birthDate.year} · '}'
+                        'supported through '
                         '${dependent.resolvedSupportEndYear}'
                         '${dependent.isStudent ? ' · student' : ''}',
                     onTap: () => _editDependent(context, ref, index),
-                    onDelete: () => notifier.saveTaxUnit(edited(
-                        dependents: [...unit.dependents]..removeAt(index))),
+                    onDelete: () => notifier.removeDependent(dependent.id),
                   ),
               ],
             ),
@@ -395,18 +394,23 @@ class TaxUnitCard extends ConsumerWidget {
     final existing = index == null ? null : unit.dependents[index];
     final thisYear = DateTime.now().year;
 
+    var name = existing?.name ?? '';
     var birthYear = existing?.birthDate.year ?? thisYear;
     var isStudent = existing?.isStudent ?? false;
     var supportEnd = existing?.supportEndYear;
 
     await showEditor<void>(
       context,
-      title: index == null
-          ? 'Add a dependant'
-          : (birthYear > thisYear ? 'Planned for $birthYear' : 'Born $birthYear'),
+      title: existing == null ? 'Add a dependant' : childName(existing),
       build: (context) => StatefulBuilder(
         builder: (context, setState) => Column(
           children: [
+            LabelledTextField(
+              label: 'Name (optional)',
+              initial: name,
+              onChanged: (v) => name = v,
+            ),
+            const SizedBox(height: 12),
             NumberChoiceField(
               label: 'Born',
               helper: birthYear > thisYear
@@ -446,6 +450,8 @@ class TaxUnitCard extends ConsumerWidget {
               child: FilledButton(
                 onPressed: () {
                   final dependent = Dependent(
+                    id: existing?.id ?? newId('dep'),
+                    name: name.trim().isEmpty ? null : name.trim(),
                     birthDate: DateTime(birthYear, 6, 15),
                     isStudent: isStudent,
                     supportEndYear: supportEnd,

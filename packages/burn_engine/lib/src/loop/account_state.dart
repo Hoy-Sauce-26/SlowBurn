@@ -167,5 +167,6 @@ class AccountState {
         allocationWeights: account.allocationWeights,
         isRestrictedPurpose: account.isRestrictedPurpose,
         targetBalanceMonths: account.targetBalanceMonths,
+        beneficiaryId: account.beneficiaryId,
       );
 }

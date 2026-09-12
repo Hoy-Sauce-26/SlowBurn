@@ -24,6 +24,7 @@ const flagHomes = <String, FlagHome>{
   'unvestedMatchAtRisk': FlagHome.accounts,
   'rothRolloverAssumed': FlagHome.accounts,
   'bufferDepleted': FlagHome.accounts,
+  'education529LeftOver': FlagHome.accounts,
 
   // What goes out.
   'possibleDoubleCount': FlagHome.spending,

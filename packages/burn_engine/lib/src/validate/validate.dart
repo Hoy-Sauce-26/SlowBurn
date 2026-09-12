@@ -220,6 +220,21 @@ List<Finding> validateHousehold(
     }
   }
 
+  // 12c. Education spending and a 529 name a child who is in the plan.
+  final childIds = {for (final d in h.dependents) d.id};
+  for (final item in h.expenseItems) {
+    if (item.dependentId != null && !childIds.contains(item.dependentId)) {
+      report(12, Severity.blocking,
+          '"${item.label}" is for a child who is not in the plan', item.id);
+    }
+  }
+  for (final a in h.accounts) {
+    if (a.beneficiaryId != null && !childIds.contains(a.beneficiaryId)) {
+      report(12, Severity.blocking,
+          '"${a.label}" is saving for a child who is not in the plan', a.id);
+    }
+  }
+
   // 13. rothContributionBasis <= balance for Roth accounts.
   for (final a in h.accounts) {
     if (a.taxTreatment == TaxTreatment.roth &&

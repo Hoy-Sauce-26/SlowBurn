@@ -240,6 +240,7 @@ const flagLabels = <String, String>{
   'filingStatusNoLongerQualifies': 'Filing status',
   'swrHorizonMismatch': 'Withdrawal rate',
   'electionExceededRealizedSurplus': 'Over-elected',
+  'education529LeftOver': 'Left in a 529',
 };
 
 /// What each one means, in the user's terms rather than the engine's.
@@ -305,4 +306,9 @@ const flagExplanations = <String, String>{
       'This withdrawal rate is high for a retirement this long.',
   'electionExceededRealizedSurplus':
       'More was withheld from pay than the year turned out to support.',
+  'education529LeftOver':
+      'A 529 still holds money after the last education bill in this plan. '
+          'Spent on anything else, its growth is taxed and pays a 10% '
+          'penalty. Putting in less, or adding a younger child\'s '
+          'education, would use it.',
 };

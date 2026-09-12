@@ -184,6 +184,11 @@ class JurisdictionRules {
 
   final Map<FilingStatus, Money> retirementIncomeExclusion;
 
+  /// What this state gives back for money put into a 529, and null where it
+  /// gives nothing. Assumes the household uses its own state's plan, which
+  /// is the one that qualifies almost everywhere.
+  final Education529Benefit? education529;
+
   const JurisdictionRules({
     required this.code,
     this.brackets = const {},
@@ -193,6 +198,7 @@ class JurisdictionRules {
     this.personalCredit = const {},
     this.conformsToPreTaxDeferrals = true,
     this.retirementIncomeExclusion = const {},
+    this.education529,
   });
 
   List<TaxBracket> bracketsFor(FilingStatus status) =>
@@ -209,6 +215,36 @@ class JurisdictionRules {
 
   bool get leviesNoIncomeTax =>
       (flatRate ?? 0) == 0 && brackets.values.every((b) => b.isEmpty);
+}
+
+/// A state's deduction or credit for 529 contributions (§4.3.6).
+class Education529Benefit {
+  /// The most contribution that counts, by filing status. Empty is no cap.
+  final Map<FilingStatus, Money> cap;
+
+  /// Whether [cap] applies to each child separately, as it does in the states
+  /// that write "per beneficiary".
+  final bool perBeneficiary;
+
+  /// Null for a deduction. For a credit, the share of what counts that comes
+  /// off the tax.
+  final Rate? creditRate;
+
+  /// Federal AGI above which nothing is given. Empty is no limit.
+  final Map<FilingStatus, Money> incomeLimit;
+
+  const Education529Benefit({
+    this.cap = const {},
+    this.perBeneficiary = false,
+    this.creditRate,
+    this.incomeLimit = const {},
+  });
+
+  Money? capFor(FilingStatus status) =>
+      cap[status] ?? cap[FilingStatus.single];
+
+  Money? incomeLimitFor(FilingStatus status) =>
+      incomeLimit[status] ?? incomeLimit[FilingStatus.single];
 }
 
 /// The whole ruleset for one tax year.

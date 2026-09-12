@@ -171,7 +171,7 @@ projections. Has no tax meaning, and reaches its people through its `TaxUnit`s.
 | `filingStatus`             | enum        | `single`, `marriedFilingJointly`, `marriedFilingSeparately`, `headOfHousehold`, `qualifyingSurvivingSpouse`                                                                                                                                                                                                                                                                                                             |
 | `stateCode`                | string      | Resident state or DC. Required even where no income tax is levied, since the ACA poverty line varies by state (§3.12).                                                                                                                                                                                                                                                                                                  |
 | `localityCode`             | string?     | NYC, Philadelphia, Ohio municipality, Maryland county, etc.                                                                                                                                                                                                                                                                                                                                                             |
-| `dependents`               | Dependent[] | `{birthDate: date, isStudent: bool, supportEndYear: int?}`. `supportEndYear` **defaults to the year the dependent turns 19, or 24 when `isStudent`**. A dependent is counted only in years `≤ supportEndYear`. Count of active dependents drives HoH qualification and ACA tax-family size; each `birthDate` drives Child Tax Credit qualification (§4.3.4, under age 17 at the end of the tax year) and its phase-out. |
+| `dependents`               | Dependent[] | `{id: ID, name: string?, birthDate: date, isStudent: bool, supportEndYear: int?}`. `id` is what education spending and a `529` name to say whose they are (§3.4, §3.7), and `name` is only ever shown. `supportEndYear` **defaults to the year the dependent turns 19, or 24 when `isStudent`**. A dependent is counted only in years `≤ supportEndYear`. Count of active dependents drives HoH qualification and ACA tax-family size; each `birthDate` drives Child Tax Credit qualification (§4.3.4, under age 17 at the end of the tax year) and its phase-out. |
 | `benchmarkPremiumOverride` | Money?      | Annual, and this `TaxUnit`'s own second-lowest-cost-silver-plan premium, if known. Null falls back to the per-person `TaxYear.acaBenchmarkPremiumByAge` (§4.3.5). It sits here because §4.3.5 reads it per `TaxUnit`.                                                                                                                                                                                                   |
 | `itemizedDeductionTotal`   | Money?      | A single entered annual figure, in today's dollars, held constant in real terms across projected years. When set and larger than the standard deduction, §4.3.2 uses it. Deriving it from mortgage interest, SALT, and charitable giving is deferred (§13.2).                                                                                                                                                           |
 
@@ -287,6 +287,7 @@ any savings or investment vehicle.
 | `assetAllocationId`         | ID?                      | For `allocationMode = singleClass`: the one `AssetClass` determining growth rate.                                                                                                                                                                                                                                                                                                                                             |
 | `allocationWeights`         | {assetClassId, weight}[] | For `allocationMode = weighted`: weights summing to 1.0, blended into a weighted-average real return each year.                                                                                                                                                                                                                                                                                                               |
 | `isRestrictedPurpose`       | bool                     | Derived from `taxTreatment = educationTaxFree`, not from `kind`, that being the axis a custom account may set. Keying it on `kind` would let a custom education account count in `liquidNetWorth` with no `WithdrawalSource` able to spend it. Restricted accounts count in `netWorth` but are excluded from `liquidNetWorth` and every retirement measure built on it (§5, §8.2), and are not a `WithdrawalSource` (§8.4.1). |
+| `beneficiaryId`             | ID?                      | For a `529`: the `Dependent` it is saving for (below). Null counts all education spending. |
 | `targetBalanceMonths`       | number?                  | Only meaningful for the household's designated cash-buffer account(s), typically `cashSavings`. Expressed as months of `annualExpenses` since expenses change year to year, so the Money target is `targetBalanceMonths × annualExpenses / 12`, recomputed each projected year. Null for every other account. See §4.4.4 step 4 and §4.5.                                                                                     |
 
 **A 529 is net worth.** Spending it on anything else costs income tax plus a 10% penalty on
@@ -294,6 +295,13 @@ the earnings, and the household holding one has almost always earmarked it for a
 child, so a fully funded college account must not push the retirement test (§8.2) over the
 line. It is spent by entering the tuition as an `ExpenseItem` under an `education`
 category, which §4.4 draws against the balance before anything else pays for it.
+
+**A 529 moves somewhere safer when its bills start, not when anyone retires.** The year its
+`retirementAllocationId` takes over is the first year of education spending tied to its
+`beneficiaryId`, or of any education spending where it names nobody. That is what age-based
+529 portfolios do, and a college fund still in shares the autumn tuition is due is the plan
+that looks best on paper and worst in a bad year. The beneficiary also scopes the state caps
+that are written per child (§4.3.6).
 
 **There is no `fsa` account kind.** An FSA is funded and spent inside the same plan year
 and anything left over is forfeited, so it has no persistent balance to compound. It is a
@@ -701,6 +709,7 @@ anywhere else leaves the college account untouched.
 | `relativeInflationRate` | Rate?  | **Real, relative to general inflation.** Healthcare ≈ +2.5%; groceries ≈ 0%; consumer electronics negative. Null inherits the category's `defaultRelativeInflation`, which is the whole point of that field; a stored 0 is a deliberate flat rate and overrides it. |
 | `phase`                 | enum   | `preRetirementOnly` \| `postRetirementOnly` \| `both`. The boundary is the household's `retirementYear`, its first retired year (§3.1), so a `preRetirementOnly` item runs through the year before it and a `postRetirementOnly` item from it.                      |
 | `postRetirementAmount`  | Money? | For `both` items whose amount changes at retirement.                                                                                                                                                                                                                |
+| `dependentId`           | ID?    | For an `education` item: the `Dependent` it is for. A `529` saving for that child is sized on it and derisks the year it starts (§3.4). |
 | `housingId`             | ID?    | For a `housingSupport` item: the home it belongs to, naming a `primaryResidence` `Asset` or the `housing` `ExpenseItem` that is the rent. Charged only in the years that home stands (§3.7). |
 
 **Relative inflation compounds; nothing else about an expense does.** An `ExpenseItem`'s
@@ -1507,8 +1516,8 @@ stateTax        = max(0, schedule − personalCredit[filingStatus]), where sched
                   brackets or flat rate for this TaxUnit's filingStatus from
                   TaxYear.stateRules[stateCode], applied to federalAgi adjusted by that
                   state's conformity flags, less its own standard deduction, personal
-                  exemption, and retirement-income exclusion. Zero in the states that
-                  levy none
+                  exemption, retirement-income exclusion, and 529 deduction, and less
+                  any 529 credit after. Zero in the states that levy none
 localTax        = the same shape against TaxYear.localRules[localityCode];
                   0 where localityCode is null
 ```
@@ -1528,6 +1537,13 @@ exempts retirement income exempts that and not a salary. Six states hand out a f
 credit where others give an exemption, so `personalCredit` comes off the tax itself and
 stops at zero rather than turning into a refund. Credits and exemptions that taper away with
 income are not modeled (§13.2).
+
+**A state gives back part of what goes into a 529, and only its own tax is touched.**
+`education529` counts this year's contributions to the unit's 529s up to the state's cap, per
+child where the state writes its cap per beneficiary, and counts nothing above its income
+limit. A deduction comes off income, and a credit is `creditRate` of what counts, off the
+tax. The household is assumed to use its own state's plan, the one that qualifies almost
+everywhere, and contributions above a cap are not carried forward to later years.
 
 ```
 withdrawalPenalty = Σ over this TaxUnit's draws this year (§8.4.1):
@@ -1588,7 +1604,7 @@ oneTimeNet        = Σ OneTimeEvent.amount this year that no account absorbed   
                   + any underwater balance from an Asset sale this year (§3.5)
 
 education529Draw  = min(Σ over the household's Accounts where isRestrictedPurpose:
-                          balance,                                             // §3.4
+                          this year's projected balance,                       // §3.4
                         Σ ExpenseItem active this year whose category's
                           metaCategory is education)
 
@@ -1620,7 +1636,12 @@ would compound untouched while the tuition it was saved for came out of the reti
 accounts. The cap is that year's own education spending, mirroring how §8.4.1 caps
 `hsaQualifiedMedical` at spending in the `health` meta-category. A qualified withdrawal is
 tax-free, so nothing here reaches §4.3, and whatever the balance cannot cover falls through
-to the ordinary sources.
+to the ordinary sources. The draw comes out of the 529s in proportion to what each holds.
+Sized off the entered balance and never taken out, the same $80,000 would pay every year's
+tuition while it went on compounding.
+
+A 529 with money left after the last education bill raises `education529LeftOver` once, in
+the year after: anything else it is spent on pays tax and a 10% penalty on the growth.
 
 **`committedContribs` covers every tax treatment, `taxable` included.** A standing
 brokerage deposit is committed money like a 401(k) deferral is, and splitting the sum by
@@ -2059,7 +2080,7 @@ measures, the FIRE number for that year, and a `flags[]` array (`shortfall`,
 `derivedPayoffDiffersFromTerm`, `filingStatusNoLongerQualifies`,
 `hsaContributionsStoppedAtMedicare`, `rothRolloverAssumed`, `retirementSpendingNotLevel`,
 `earningsTestNotModeled`,
-`escrowDiffersFromInferred`, `noHousingCost`).
+`escrowDiffersFromInferred`, `noHousingCost`, `education529LeftOver`).
 
 A run produces three `ProjectionResult`s per scenario, one per return band, each carrying
 that band's ordered `YearResult`s and its solved `retirementYear`. A run may also
@@ -2167,11 +2188,15 @@ spending (§3.7), including debt service still outstanding in retirement plus an
 costs that continue past a mortgage payoff (§3.6).
 
 **Retirement spending is a stream, and the FIRE number prices the stream.** `S(t)` is
-`annualExpenses` (§4.4) projected across retirement: every `ExpenseItem` at its
+`annualExpenses − education529Draw` (§4.4) projected across retirement: every `ExpenseItem` at its
 post-retirement `phase`, compounded at its relative inflation rate (§3.7) and honoring its
 own `startYear`/`endYear`, debt service running until each loan's derived payoff and then
 dropping to whatever escrow continues (§3.6), and health insurance following its ACA →
 Medicare schedule at 65 (§8.4.3).
+
+The tuition a 529 pays is taken out of `S(t)`. The 529 sits outside the
+`afterTaxLiquidNetWorth` the target is measured against (§3.4), so leaving its tuition in
+charged for it twice, and opening a 529 made retiring later.
 
 Sizing the portfolio off the *first* year of that stream would charge the household for a
 mortgage payment for the rest of their life when the mortgage retires in 2041, and §3.6

@@ -16,6 +16,10 @@ String formatMoney(Money m) => _money.format(m.dollars);
 
 String formatMoneyCompact(Money m) => _compact.format(m.dollars);
 
+/// For an estimate, where cents would claim a precision it does not have.
+String formatMoneyWhole(Money m) => _whole.format(m.dollars);
+final _whole = NumberFormat.currency(symbol: r'$', decimalDigits: 0);
+
 String formatPercent(Rate r) =>
     '${(r * 100).toStringAsFixed(r * 100 % 1 == 0 ? 0 : 2)}%';
 

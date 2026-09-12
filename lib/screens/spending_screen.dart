@@ -2,11 +2,13 @@ import 'package:burn_engine/burn_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/college.dart';
 import '../services/providers.dart';
 import '../services/flag_placement.dart';
 import '../widgets/entity_list.dart';
 import '../widgets/flag_banner.dart';
 import '../widgets/fields.dart';
+import 'accounts_screen.dart';
 
 /// §3.7. What the household spends, and what changes at retirement.
 ///
@@ -55,12 +57,30 @@ class SpendingScreen extends ConsumerWidget {
               // of them stop when the house is sold.
               if (meta == MetaCategory.housingSupport)
                 for (final group in _byHome(byCategory[meta]!, household))
-                  _HomeGroup(
+                  _Group(
+                    icon: Icons.home_outlined,
                     title: group.title,
                     items: group.items,
                     describe: (i) => _describe(i, categories[i.categoryId]),
                     onTap: (i) => editExpense(context, ref, i),
                     onDelete: (i) => notifier.removeExpenseItem(i.id),
+                  )
+              // Education is gathered by child, since a 529 saves for one of
+              // them and is sized on what theirs costs.
+              else if (meta == MetaCategory.education)
+                for (final plan in educationByChild(household))
+                  _Group(
+                    icon: Icons.school_outlined,
+                    title: plan.child != null
+                        ? childName(plan.child!)
+                        : household.dependents.isEmpty
+                            ? 'Education'
+                            : 'Not tied to a child',
+                    items: plan.items,
+                    describe: (i) => _describe(i, categories[i.categoryId]),
+                    onTap: (i) => editExpense(context, ref, i),
+                    onDelete: (i) => notifier.removeExpenseItem(i.id),
+                    action: _collegeAction(context, ref, household, plan),
                   )
               else
                 for (final item in byCategory[meta]!)
@@ -120,6 +140,30 @@ class SpendingScreen extends ConsumerWidget {
       if (grouped.containsKey(''))
         (title: 'Not tied to a home', items: grouped['']!),
     ];
+  }
+
+  /// Open the 529 already saving for this, or offer one that pays for all of
+  /// it.
+  Widget _collegeAction(BuildContext context, WidgetRef ref,
+      Household household, EducationPlan plan) {
+    const accounts = AccountsScreen();
+    final existing = collegeAccountFor(household, plan.child);
+    if (existing != null) {
+      return TextButton(
+        onPressed: () => accounts.editAccount(context, ref, existing),
+        child: Text('Open ${existing.label}'),
+      );
+    }
+    return TextButton.icon(
+      icon: const Icon(Icons.savings_outlined, size: 18),
+      onPressed: household.people.isEmpty
+          ? null
+          : () => accounts.editAccount(context, ref, null,
+              draft: collegeDraft(
+                  household, plan, ref.read(assetClassesProvider),
+                  thisYear: DateTime.now().year)),
+      label: const Text('Save for this in a 529'),
+    );
   }
 
   static String _totalOf(List<ExpenseItem> items) {
@@ -285,7 +329,14 @@ class SpendingScreen extends ConsumerWidget {
     var startYear = existing?.startYear;
     var endYear = existing?.endYear;
     var housingId = existing?.housingId;
+    var dependentId = existing?.dependentId;
+    final children = household.dependents.toList();
     final thisYear = DateTime.now().year;
+    String? forWhom() => children
+        .where((d) => d.id == dependentId && (d.name?.trim().isNotEmpty ?? false))
+        .firstOrNull
+        ?.name
+        ?.trim();
 
     await showEditor<void>(
       context,
@@ -345,6 +396,19 @@ class SpendingScreen extends ConsumerWidget {
                     endYear = h.toYear;
                   }
                 }),
+              ),
+            ],
+            if (meta == MetaCategory.education && children.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SearchableField<Dependent>(
+                label: 'For which child',
+                helper: 'A 529 for them is sized on this, and moves somewhere '
+                    'safer the year it starts.',
+                values: children,
+                value: children.where((d) => d.id == dependentId).firstOrNull,
+                noneLabel: 'Not tied to one',
+                describe: (d) => childName(d),
+                onChanged: (d) => setState(() => dependentId = d?.id),
               ),
             ],
             const SizedBox(height: 16),
@@ -422,7 +486,7 @@ class SpendingScreen extends ConsumerWidget {
               onChanged: (v) => label = v,
             ),
             const SizedBox(height: 4),
-            Note('Left blank, this will be called "${defaultExpenseLabel(household, meta: meta, excluding: existing?.id)}".'),
+            Note('Left blank, this will be called "${defaultExpenseLabel(household, meta: meta, forWhom: meta == MetaCategory.education ? forWhom() : null, excluding: existing?.id)}".'),
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerRight,
@@ -446,7 +510,11 @@ class SpendingScreen extends ConsumerWidget {
                     categoryId: category.id,
                     label: label.trim().isEmpty
                         ? defaultExpenseLabel(household,
-                            meta: meta, excluding: existing?.id)
+                            meta: meta,
+                            forWhom: meta == MetaCategory.education
+                                ? forWhom()
+                                : null,
+                            excluding: existing?.id)
                         : label.trim(),
                     amount: amount * frequency.perYear,
                     frequency: ExpenseFrequency.annual,
@@ -459,6 +527,8 @@ class SpendingScreen extends ConsumerWidget {
                     housingId: meta == MetaCategory.housingSupport
                         ? housingId
                         : null,
+                    dependentId:
+                        meta == MetaCategory.education ? dependentId : null,
                   ));
                   Navigator.of(context).pop();
                 },
@@ -496,14 +566,18 @@ String defaultEventLabel(
           .map((e) => e.label));
 }
 
-/// The category it belongs to, which is what most lines would be called anyway.
+/// The category it belongs to, which is what most lines would be called anyway,
+/// and whose it is where it belongs to a named child.
 String defaultExpenseLabel(
   Household household, {
   required MetaCategory meta,
+  String? forWhom,
   Id? excluding,
 }) =>
     uniqueLabel(
-        metaCategoryName(meta),
+        forWhom == null
+            ? metaCategoryName(meta)
+            : "$forWhom's ${metaCategoryName(meta).toLowerCase()}",
         household.expenseItems
             .where((i) => i.id != excluding)
             .map((i) => i.label));
@@ -570,20 +644,25 @@ List<HousingHome> homesIn(Household household) {
   ];
 }
 
-/// One home's running costs, under its name.
-class _HomeGroup extends StatelessWidget {
+/// Lines that belong together, under what they belong to: one home's running
+/// costs, or one child's education.
+class _Group extends StatelessWidget {
+  final IconData icon;
   final String title;
   final List<ExpenseItem> items;
   final String Function(ExpenseItem) describe;
   final void Function(ExpenseItem) onTap;
   final void Function(ExpenseItem) onDelete;
+  final Widget? action;
 
-  const _HomeGroup({
+  const _Group({
+    required this.icon,
     required this.title,
     required this.items,
     required this.describe,
     required this.onTap,
     required this.onDelete,
+    this.action,
   });
 
   @override
@@ -597,8 +676,7 @@ class _HomeGroup extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
           child: Row(
             children: [
-              Icon(Icons.home_outlined,
-                  size: 16, color: theme.colorScheme.onSurfaceVariant),
+              Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(title,
@@ -620,6 +698,8 @@ class _HomeGroup extends StatelessWidget {
             onTap: () => onTap(item),
             onDelete: () => onDelete(item),
           ),
+        if (action != null)
+          Align(alignment: Alignment.centerLeft, child: action),
       ],
     );
   }
